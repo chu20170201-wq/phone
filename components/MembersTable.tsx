@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { format, parse, differenceInDays, isValid } from 'date-fns';
-import { CheckCircle, XCircle, ExternalLink, Edit2, Save, X, User, Plus, Clock, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle, XCircle, ExternalLink, Edit2, Save, X, User, Plus, Clock, Trash2, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface Member {
   rowNumber: number;
@@ -61,7 +61,12 @@ function formatExpireDate(expireAt: string | undefined | null): { formatted: str
   }
 }
 
-export default function MembersTable() {
+interface MembersTableProps {
+  selectedUserId?: string | null;
+  onUserIdProcessed?: () => void;
+}
+
+export default function MembersTable({ selectedUserId, onUserIdProcessed }: MembersTableProps = {}) {
   const queryClient = useQueryClient();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -75,15 +80,62 @@ export default function MembersTable() {
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
+  const [searchUserId, setSearchUserId] = useState<string>('');
+  
+  // 筛选状态
+  const [expireFilter, setExpireFilter] = useState<string>('all'); // 'all', 'expired', 'active'
+  const [planFilter, setPlanFilter] = useState<string>('all'); // 'all', 'pro', 'nopro'
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'active', 'inactive'
+  
+  // 排序状态
+  const [sortBy, setSortBy] = useState<string>('default'); // 'default', 'expireDate', 'startDate', 'plan', 'status'
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['members'],
     queryFn: async () => {
       const res = await axios.get('/api/members');
       return res.data.data as Member[];
     },
-    refetchInterval: 30000,
+    staleTime: 2 * 60 * 1000, // 2 分钟内数据视为新鲜
+    refetchInterval: 60000, // 每 60 秒自动刷新
   });
+
+  // 當 selectedUserId 改變時，自動選中對應的會員
+  React.useEffect(() => {
+    if (selectedUserId) {
+      if (data) {
+        const member = data.find(m => m.userId === selectedUserId);
+        if (member) {
+          setSelectedMember(member);
+          // 觸發回調，表示已處理
+          if (onUserIdProcessed) {
+            onUserIdProcessed();
+          }
+        } else {
+          // 如果找不到會員，可能是剛創建的，需要刷新數據
+          refetch().then(() => {
+            // 刷新後再次查找
+            setTimeout(() => {
+              const refreshedData = queryClient.getQueryData<Member[]>(['members']);
+              if (refreshedData) {
+                const member = refreshedData.find(m => m.userId === selectedUserId);
+                if (member) {
+                  setSelectedMember(member);
+                  if (onUserIdProcessed) {
+                    onUserIdProcessed();
+                  }
+                }
+              }
+            }, 500);
+          });
+        }
+      } else {
+        // 如果數據還沒加載，先刷新
+        refetch();
+      }
+    }
+  }, [selectedUserId, data, onUserIdProcessed, refetch, queryClient]);
 
   if (isLoading) {
     return (
@@ -132,63 +184,160 @@ export default function MembersTable() {
     }
   };
 
-  // 按方案、狀態和到期時間排序：pro > nopro，active > inactive，未到期 > 已到期
-  const sortedMembers = [...members].sort((a, b) => {
-    // 首先按方案排序：pro 優先於 nopro
-    const planOrder: { [key: string]: number } = { pro: 1, nopro: 2 };
-    const planA = planOrder[a.plan] || 999;
-    const planB = planOrder[b.plan] || 999;
-    
-    if (planA !== planB) {
-      return planA - planB;
+  // 解析開始日期
+  const parseStartDate = (dateString: string | undefined | null): Date | null => {
+    if (!dateString || dateString.trim() === '') {
+      return null;
     }
-    
-    // 然後按狀態排序：active 優先於 inactive
-    const statusOrder: { [key: string]: number } = { active: 1, inactive: 2 };
-    const statusA = statusOrder[a.status] || 999;
-    const statusB = statusOrder[b.status] || 999;
-    
-    if (statusA !== statusB) {
-      return statusA - statusB;
+    try {
+      if (dateString.includes('/')) {
+        const [year, month, day] = dateString.split('/').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      return date;
+    } catch {
+      return null;
     }
-    
-    // 按到期時間排序：未到期排在前面，未到期中按到期時間升序（越早到期的越前）
-    const expireDateA = parseExpireDate(a.expireAt);
-    const expireDateB = parseExpireDate(b.expireAt);
+  };
+
+  // 檢查是否過期
+  const isExpired = (expireAt: string | undefined | null): boolean => {
+    const expireDate = parseExpireDate(expireAt);
+    if (!expireDate) return false;
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // 設置為當天的 00:00:00
-    
-    // 如果兩個日期都無法解析，保持原順序
-    if (!expireDateA && !expireDateB) {
-      return a.rowNumber - b.rowNumber;
+    now.setHours(0, 0, 0, 0);
+    const expireDateNormalized = new Date(expireDate);
+    expireDateNormalized.setHours(0, 0, 0, 0);
+    return expireDateNormalized < now;
+  };
+
+  // 應用篩選
+  const filteredMembers = members.filter(member => {
+    // User ID 搜尋
+    if (searchUserId.trim()) {
+      const keyword = searchUserId.trim().toLowerCase();
+      const uid = (member.userId || '').toLowerCase();
+      if (!uid.includes(keyword)) {
+        return false;
+      }
+    }
+
+    // 過期狀態篩選
+    if (expireFilter === 'expired' && !isExpired(member.expireAt)) {
+      return false;
+    }
+    if (expireFilter === 'active' && isExpired(member.expireAt)) {
+      return false;
     }
     
-    // 如果一個無法解析，無法解析的排在後面
-    if (!expireDateA) return 1;
-    if (!expireDateB) return -1;
-    
-    const expireDateANormalized = new Date(expireDateA);
-    expireDateANormalized.setHours(0, 0, 0, 0);
-    const expireDateBNormalized = new Date(expireDateB);
-    expireDateBNormalized.setHours(0, 0, 0, 0);
-    
-    const isExpiredA = expireDateANormalized < now;
-    const isExpiredB = expireDateBNormalized < now;
-    
-    // 未到期的排在已過期的前面
-    if (isExpiredA !== isExpiredB) {
-      return isExpiredA ? 1 : -1; // 已過期排在後面
+    // 方案篩選
+    if (planFilter !== 'all') {
+      const expireInfo = formatExpireDate(member.expireAt);
+      const isCurrentlyPro = !expireInfo.isExpired;
+      if (planFilter === 'pro' && !isCurrentlyPro) {
+        return false;
+      }
+      if (planFilter === 'nopro' && isCurrentlyPro) {
+        return false;
+      }
     }
     
-    // 如果都是未到期，按到期時間升序（越早到期的越前）
-    // 如果都是已過期，按到期時間降序（越晚過期的越前）
-    if (!isExpiredA && !isExpiredB) {
-      // 都是未到期，按到期時間升序
-      return expireDateANormalized.getTime() - expireDateBNormalized.getTime();
-    } else {
-      // 都是已過期，按到期時間降序
-      return expireDateBNormalized.getTime() - expireDateANormalized.getTime();
+    // 狀態篩選
+    if (statusFilter !== 'all' && member.status !== statusFilter) {
+      return false;
     }
+    
+    return true;
+  });
+
+  // 應用排序
+  const sortedMembers = [...filteredMembers].sort((a, b) => {
+    if (sortBy === 'default') {
+      // 默認排序：pro > nopro，active > inactive，未到期 > 已到期
+      const planOrder: { [key: string]: number } = { pro: 1, nopro: 2 };
+      const planA = planOrder[a.plan] || 999;
+      const planB = planOrder[b.plan] || 999;
+      
+      if (planA !== planB) {
+        return planA - planB;
+      }
+      
+      const statusOrder: { [key: string]: number } = { active: 1, inactive: 2 };
+      const statusA = statusOrder[a.status] || 999;
+      const statusB = statusOrder[b.status] || 999;
+      
+      if (statusA !== statusB) {
+        return statusA - statusB;
+      }
+      
+      const expireDateA = parseExpireDate(a.expireAt);
+      const expireDateB = parseExpireDate(b.expireAt);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      if (!expireDateA && !expireDateB) {
+        return a.rowNumber - b.rowNumber;
+      }
+      if (!expireDateA) return 1;
+      if (!expireDateB) return -1;
+      
+      const expireDateANormalized = new Date(expireDateA);
+      expireDateANormalized.setHours(0, 0, 0, 0);
+      const expireDateBNormalized = new Date(expireDateB);
+      expireDateBNormalized.setHours(0, 0, 0, 0);
+      
+      const isExpiredA = expireDateANormalized < now;
+      const isExpiredB = expireDateBNormalized < now;
+      
+      if (isExpiredA !== isExpiredB) {
+        return isExpiredA ? 1 : -1;
+      }
+      
+      if (!isExpiredA && !isExpiredB) {
+        return expireDateANormalized.getTime() - expireDateBNormalized.getTime();
+      } else {
+        return expireDateBNormalized.getTime() - expireDateANormalized.getTime();
+      }
+    } else if (sortBy === 'expireDate') {
+      const expireDateA = parseExpireDate(a.expireAt);
+      const expireDateB = parseExpireDate(b.expireAt);
+      
+      if (!expireDateA && !expireDateB) return 0;
+      if (!expireDateA) return 1;
+      if (!expireDateB) return -1;
+      
+      const diff = expireDateA.getTime() - expireDateB.getTime();
+      return sortOrder === 'asc' ? diff : -diff;
+    } else if (sortBy === 'startDate') {
+      const startDateA = parseStartDate(a.startAt);
+      const startDateB = parseStartDate(b.startAt);
+      
+      if (!startDateA && !startDateB) return 0;
+      if (!startDateA) return 1;
+      if (!startDateB) return -1;
+      
+      const diff = startDateA.getTime() - startDateB.getTime();
+      return sortOrder === 'asc' ? diff : -diff;
+    } else if (sortBy === 'plan') {
+      const planOrder: { [key: string]: number } = { pro: 1, nopro: 2 };
+      const planA = planOrder[a.plan] || 999;
+      const planB = planOrder[b.plan] || 999;
+      const diff = planA - planB;
+      return sortOrder === 'asc' ? diff : -diff;
+    } else if (sortBy === 'status') {
+      const statusOrder: { [key: string]: number } = { active: 1, inactive: 2 };
+      const statusA = statusOrder[a.status] || 999;
+      const statusB = statusOrder[b.status] || 999;
+      const diff = statusA - statusB;
+      return sortOrder === 'asc' ? diff : -diff;
+    }
+    
+    // 默认返回行号排序
+    return a.rowNumber - b.rowNumber;
   });
   
   const totalPages = Math.ceil(sortedMembers.length / itemsPerPage);
@@ -328,12 +477,149 @@ export default function MembersTable() {
   return (
     <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50">
       <div className="px-6 py-6 sm:p-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               會員管理
             </h2>
-            <p className="text-sm text-gray-500 mt-1">共 {members.length.toLocaleString()} 位會員</p>
+            <p className="text-sm text-gray-500 mt-1">
+              共 {members.length.toLocaleString()} 位會員
+              {filteredMembers.length !== members.length && (
+                <span className="ml-2 text-purple-600 font-semibold">
+                  （已篩選：{filteredMembers.length.toLocaleString()} 位）
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* User ID 搜尋欄位 */}
+          <div className="w-full sm:w-64">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              搜尋 User ID
+            </label>
+            <input
+              type="text"
+              value={searchUserId}
+              onChange={(e) => {
+                setSearchUserId(e.target.value);
+                setPage(1);
+              }}
+              placeholder="輸入 User ID 進行搜尋"
+              className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+            />
+          </div>
+        </div>
+
+        {/* 篩選和排序控制 */}
+        <div className="mb-6 space-y-4">
+          {/* 篩選選項 */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Filter className="w-4 h-4" />
+              <span>篩選：</span>
+            </div>
+            
+            {/* 過期狀態篩選 */}
+            <button
+              onClick={() => {
+                setExpireFilter(expireFilter === 'all' ? 'expired' : expireFilter === 'expired' ? 'active' : 'all');
+                setPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                expireFilter === 'all'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : expireFilter === 'expired'
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+              }`}
+            >
+              {expireFilter === 'all' ? '全部' : expireFilter === 'expired' ? '已過期' : '未過期'}
+            </button>
+            
+            {/* 方案篩選 */}
+            <button
+              onClick={() => {
+                setPlanFilter(planFilter === 'all' ? 'pro' : planFilter === 'pro' ? 'nopro' : 'all');
+                setPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                planFilter === 'all'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : planFilter === 'pro'
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {planFilter === 'all' ? '全部方案' : planFilter === 'pro' ? 'Pro' : '試用'}
+            </button>
+            
+            {/* 狀態篩選 */}
+            <button
+              onClick={() => {
+                setStatusFilter(statusFilter === 'all' ? 'active' : statusFilter === 'active' ? 'inactive' : 'all');
+                setPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                statusFilter === 'all'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : statusFilter === 'active'
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {statusFilter === 'all' ? '全部狀態' : statusFilter === 'active' ? '啟用' : '停用'}
+            </button>
+            
+            {/* 清除篩選 */}
+            {(expireFilter !== 'all' || planFilter !== 'all' || statusFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setExpireFilter('all');
+                  setPlanFilter('all');
+                  setStatusFilter('all');
+                  setPage(1);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all duration-200"
+              >
+                清除篩選
+              </button>
+            )}
+          </div>
+
+          {/* 排序選項 */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <ArrowUpDown className="w-4 h-4" />
+              <span>排序：</span>
+            </div>
+            
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPage(1);
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            >
+              <option value="default">預設排序</option>
+              <option value="expireDate">到期時間</option>
+              <option value="startDate">開始時間</option>
+              <option value="plan">方案</option>
+              <option value="status">狀態</option>
+            </select>
+            
+            {sortBy !== 'default' && (
+              <button
+                onClick={() => {
+                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all duration-200 flex items-center gap-2"
+                title={sortOrder === 'asc' ? '升序' : '降序'}
+              >
+                {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                <span>{sortOrder === 'asc' ? '升序' : '降序'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -371,9 +657,9 @@ export default function MembersTable() {
                 
                 return (
                   <tr key={member.rowNumber} className="hover:bg-blue-50/50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {member.rowNumber}
-                    </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {member.rowNumber}
+                  </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {isEditing ? (
                         <div className="flex items-center space-x-3">
@@ -412,29 +698,29 @@ export default function MembersTable() {
                             <div className="flex items-center space-x-2 mt-1">
                               <span className="font-mono text-xs text-gray-500 truncate max-w-[120px]">
                                 {member.userId || '無'}
-                              </span>
-                              {member.userId && (
-                                <button
+                      </span>
+                      {member.userId && (
+                        <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const recordsUrl = `/api/phone-records?userId=${member.userId}`;
-                                    window.open(recordsUrl, '_blank');
-                                  }}
+                            const recordsUrl = `/api/phone-records?userId=${member.userId}`;
+                            window.open(recordsUrl, '_blank');
+                          }}
                                   className="text-blue-600 hover:text-blue-800"
                                   title="查看查詢記錄"
-                                >
+                        >
                                   <ExternalLink className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                        </button>
+                      )}
+                    </div>
                           </div>
                         </div>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {member.displayName || member.lineName || '-'}
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                  </td>
+                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                       {isEditing ? (
                         <select
                           value={editForm.plan}
@@ -447,8 +733,8 @@ export default function MembersTable() {
                       ) : (
                         getPlanBadge(member.plan, member.expireAt)
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {isEditing ? (
                         <select
                           value={editForm.status}
@@ -462,8 +748,8 @@ export default function MembersTable() {
                       ) : (
                         getStatusBadge(member.status)
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex flex-col">
                         <span className={expireInfo.isExpired ? 'text-red-600 font-semibold' : ''}>
                           {expireInfo.formatted}
@@ -482,8 +768,8 @@ export default function MembersTable() {
                           </span>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         {isEditing ? (
                           <>
@@ -522,8 +808,8 @@ export default function MembersTable() {
                               <Plus className="w-4 h-4" />
                               <span className="text-xs">加值</span>
                             </button>
-                            <button
-                              onClick={() => setSelectedMember(member)}
+                    <button
+                      onClick={() => setSelectedMember(member)}
                               className="px-3 py-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 flex items-center space-x-1"
                               title="查看詳情"
                             >
@@ -536,12 +822,12 @@ export default function MembersTable() {
                             >
                               <Trash2 className="w-4 h-4" />
                               <span className="text-xs">刪除</span>
-                            </button>
+                    </button>
                           </>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                  </td>
+                </tr>
                 );
               })}
             </tbody>
@@ -605,7 +891,7 @@ export default function MembersTable() {
                     <User className="w-10 h-10 text-white" />
                   </div>
                 )}
-                <div>
+                  <div>
                   <h4 className="text-xl font-bold text-gray-900">
                     {selectedMember.displayName || selectedMember.lineName || '未設定'}
                   </h4>
