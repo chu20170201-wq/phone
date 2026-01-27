@@ -2,10 +2,33 @@ import { google } from 'googleapis';
 
 // Google Sheets API 客户端初始化
 export async function getSheetsClient() {
+  // 处理私钥格式：Vercel 环境变量中的换行符可能是 \n 字符串或实际换行符
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+  
+  if (!privateKey) {
+    throw new Error('GOOGLE_PRIVATE_KEY environment variable is not set');
+  }
+
+  // 处理换行符：Vercel 中可能存储为 \n 字符串
+  if (privateKey.includes('\\n')) {
+    // 替换 \\n 为实际换行符
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+  
+  // 验证私钥格式
+  if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
+    throw new Error('Invalid private key format: missing BEGIN or END PRIVATE KEY');
+  }
+
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  if (!clientEmail) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_EMAIL environment variable is not set');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      client_email: clientEmail,
+      private_key: privateKey,
     },
     scopes: [
       'https://www.googleapis.com/auth/spreadsheets.readonly',
@@ -21,6 +44,10 @@ export async function getSheetsClient() {
 export async function getPhoneRecords() {
   const sheets = await getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  
+  if (!spreadsheetId) {
+    throw new Error('Missing required parameters: spreadsheetId');
+  }
 
   // 读取 Sheet1 的数据（从第 2 行开始，第 1 行是标题）
   const response = await sheets.spreadsheets.values.get({
@@ -318,7 +345,7 @@ export async function updateMember(
   lineName?: string
 ) {
   const sheets = await getSheetsClient();
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const spreadsheetIdEnv = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 
   // 獲取工作表 ID
   const sheetId = await getSheetId('Members / Subscriptions');
@@ -328,6 +355,10 @@ export async function updateMember(
 
   // 檢查 B列（plan，索引 1）是否包含公式
   // rowNumber 是實際行號（從 2 開始，第 1 行是標題）
+  if (!spreadsheetIdEnv) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID 未設置');
+  }
+  const spreadsheetId = spreadsheetIdEnv as string;
   const planHasFormula = await cellHasFormula(spreadsheetId, sheetId, rowNumber, 1);
 
   // 更新 Members 工作表的列：
@@ -639,6 +670,95 @@ export async function syncMembers() {
     existing: existingUserIds.size,
     newUserIds: newUserIds,
   };
+}
+
+// 檢查並創建單個會員（如果不存在）
+export async function ensureMemberExists(userId: string): Promise<{ created: boolean; member: any }> {
+  const sheets = await getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error('ensureMemberExists: Missing spreadsheetId');
+  }
+
+  // 1. 檢查會員是否已存在
+  const existingMember = await getMemberByUserId(userId);
+  if (existingMember) {
+    return { created: false, member: existingMember };
+  }
+
+  // 2. 如果不存在，創建新會員（7天試用期）
+  const today = new Date();
+  const trialEndDate = new Date(today);
+  trialEndDate.setDate(trialEndDate.getDate() + 7);
+
+  const startAt = formatDateForSheets(today);
+  const expireAt = formatDateForSheets(trialEndDate);
+
+  const newRow = [
+    userId,           // A列: userId
+    '',               // B列: plan（留空，由公式自動計算）
+    'active',         // C列: status（啟用）
+    startAt,          // D列: startAt
+    expireAt,         // E列: expireAt（7天後）
+    '',               // F列: LINE名稱（空）
+    '',               // G列: 狀態（空）
+    '',               // H列: 聯絡電話（空）
+    '',               // I列: 繳費方式（空）
+    '',               // J列: 繳費時間（空）
+  ];
+
+  // 3. 追加新行到 Members 工作表
+  const appendResponse = await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: 'Members / Subscriptions!A:J',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [newRow],
+    },
+  });
+
+  // 4. 獲取新添加行的行號並設置公式
+  const updatedRange = appendResponse.data.updates?.updatedRange || '';
+  const rowMatch = updatedRange.match(/!A(\d+):/);
+  const newRowNumber = rowMatch ? parseInt(rowMatch[1], 10) : null;
+
+  if (newRowNumber) {
+    const sheetId = await getSheetId('Members / Subscriptions');
+    if (sheetId) {
+      const formula = `=IF(D${newRowNumber}="","",IF(E${newRowNumber}<TODAY(),"nopro","pro"))`;
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              updateCells: {
+                range: {
+                  sheetId: sheetId,
+                  startRowIndex: newRowNumber - 1,
+                  endRowIndex: newRowNumber,
+                  startColumnIndex: 1, // B列 (索引 1)
+                  endColumnIndex: 2,
+                },
+                rows: [{
+                  values: [{
+                    userEnteredValue: {
+                      formulaValue: formula,
+                    },
+                  }],
+                }],
+                fields: 'userEnteredValue.formulaValue',
+              },
+            },
+          ],
+        },
+      });
+    }
+  }
+
+  // 5. 獲取新創建的會員資料
+  const newMember = await getMemberByUserId(userId);
+  return { created: true, member: newMember };
 }
 
 // 獲取風險名單（Sheet2）
