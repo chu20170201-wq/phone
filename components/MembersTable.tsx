@@ -692,9 +692,15 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-gray-900 truncate">
-                              {member.displayName || member.lineName || '未設定'}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(member)}
+                              className="text-left w-full"
+                            >
+                              <div className="text-sm font-semibold text-gray-900 truncate underline decoration-dashed decoration-gray-400 hover:decoration-solid">
+                                {member.displayName || member.lineName || '未設定'}
+                              </div>
+                            </button>
                             <div className="flex items-center space-x-2 mt-1">
                               <span className="font-mono text-xs text-gray-500 truncate max-w-[120px]">
                                 {member.userId || '無'}
