@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { Phone, Users, Clock, TrendingUp, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
+import { Phone, Users, Clock, TrendingUp, AlertTriangle, Shield, CheckCircle, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 
 // 安全的日期格式化函數
@@ -28,6 +28,30 @@ function truncateUserId(userId: string, maxLength: number = 12): string {
   return userId.substring(0, maxLength) + '...';
 }
 
+// 複製到剪貼板
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    // 降級方案：使用傳統方法
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
+    } catch {
+      document.body.removeChild(textArea);
+      return false;
+    }
+  }
+}
+
 interface PhoneRecord {
   rowNumber: number;
   phoneNumber: string;
@@ -51,6 +75,7 @@ interface Member {
 export default function RecentDataReport() {
   const [recordLimit, setRecordLimit] = useState<number>(10);
   const [memberLimit, setMemberLimit] = useState<number>(10);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   // 獲取最新的電話記錄
   const { data: recentRecords, isLoading: loadingRecords } = useQuery({
@@ -59,7 +84,8 @@ export default function RecentDataReport() {
       const res = await axios.get(`/api/recent-data?type=records&limit=${recordLimit}`);
       return res.data.data as PhoneRecord[];
     },
-    refetchInterval: 30000, // 每 30 秒自動刷新
+    staleTime: 1 * 60 * 1000, // 1 分钟内数据视为新鲜（最新数据需要更频繁更新）
+    refetchInterval: 30000, // 每 30 秒自動刷新（最新数据保持 30 秒刷新）
   });
 
   // 獲取最新的會員記錄
@@ -69,7 +95,8 @@ export default function RecentDataReport() {
       const res = await axios.get(`/api/recent-data?type=members&limit=${memberLimit}`);
       return res.data.data as Member[];
     },
-    refetchInterval: 30000, // 每 30 秒自動刷新
+    staleTime: 1 * 60 * 1000, // 1 分钟内数据视为新鲜
+    refetchInterval: 30000, // 每 30 秒自動刷新（最新数据保持 30 秒刷新）
   });
 
   const getRiskLevelIcon = (riskLevel: string) => {
@@ -222,7 +249,34 @@ export default function RecentDataReport() {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                        {record.userId ? truncateUserId(record.userId) : '-'}
+                        {record.userId ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono text-xs text-gray-500">
+                              {truncateUserId(record.userId)}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const success = await copyToClipboard(record.userId);
+                                if (success) {
+                                  setCopiedUserId(record.userId);
+                                  setTimeout(() => setCopiedUserId(null), 2000);
+                                } else {
+                                  alert('複製失敗，請手動複製');
+                                }
+                              }}
+                              className="text-gray-400 hover:text-gray-700"
+                              title={copiedUserId === record.userId ? '已複製' : '複製 User ID'}
+                            >
+                              {copiedUserId === record.userId ? (
+                                <Check className="w-3 h-3 text-green-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {record.displayName || '-'}
@@ -311,7 +365,34 @@ export default function RecentDataReport() {
                         {member.displayName || member.lineName || '未設定'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                        {member.userId ? truncateUserId(member.userId) : '-'}
+                        {member.userId ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono text-xs text-gray-500">
+                              {truncateUserId(member.userId)}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const success = await copyToClipboard(member.userId);
+                                if (success) {
+                                  setCopiedUserId(member.userId);
+                                  setTimeout(() => setCopiedUserId(null), 2000);
+                                } else {
+                                  alert('複製失敗，請手動複製');
+                                }
+                              }}
+                              className="text-gray-400 hover:text-gray-700"
+                              title={copiedUserId === member.userId ? '已複製' : '複製 User ID'}
+                            >
+                              {copiedUserId === member.userId ? (
+                                <Check className="w-3 h-3 text-green-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {getPlanBadge(member.plan)}
