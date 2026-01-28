@@ -452,6 +452,54 @@ export async function getRecordsByUserId(userId: string) {
   return records.filter(record => record.userId === userId);
 }
 
+// 刪除電話紀錄（Sheet1）並同步刪除關聯的風險名單記錄（Sheet2）
+export async function deletePhoneRecordAndRelated(rowNumber: number) {
+  const sheets = await getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+
+  if (!spreadsheetId) {
+    throw new Error('Missing required parameters: spreadsheetId');
+  }
+
+  // 先讀取該行資料，取得 phoneNumber / userId 以便刪除關聯資料
+  const readRange = `Sheet1!A${rowNumber}:AV${rowNumber}`;
+  const readResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: readRange,
+  });
+
+  const row = readResponse.data.values?.[0] || [];
+  const phoneNumber = row[0] || '';
+  const userId = row[11] || '';
+
+  // 將 Sheet1 中的指定行清空（使用 clear，避免依賴 sheetId）
+  const clearRange = `Sheet1!A${rowNumber}:AV${rowNumber}`;
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: clearRange,
+  });
+
+  // 如果有 phoneNumber 或 userId，嘗試刪除 Sheet2 中關聯的風險記錄
+  if (phoneNumber || userId) {
+    const riskList = await getRiskList();
+    const rowsToDelete = riskList
+      .filter((r) => {
+        const matchPhone = phoneNumber && r.phoneNumber === phoneNumber;
+        const matchUser = userId && r.userId === userId;
+        return matchPhone || matchUser;
+      })
+      .map((r) => r.rowNumber);
+
+    if (rowsToDelete.length > 0) {
+      // 刪除多行時，必須從行號較大的開始刪，避免索引位移
+      rowsToDelete.sort((a, b) => b - a);
+      for (const riskRow of rowsToDelete) {
+        await deleteRiskRecord(riskRow);
+      }
+    }
+  }
+}
+
 // 刪除會員（Members 工作表）
 export async function deleteMember(rowNumber: number) {
   const sheets = await getSheetsClient();
