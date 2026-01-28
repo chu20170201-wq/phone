@@ -344,7 +344,16 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   const startIndex = (page - 1) * itemsPerPage;
   const paginatedMembers = sortedMembers.slice(startIndex, startIndex + itemsPerPage);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, expireAt?: string) => {
+    // 如果提供了到期時間且已過期，強制顯示為「已過期」
+    let displayStatus = status;
+    if (expireAt && expireAt.trim() !== '') {
+      const expireInfo = formatExpireDate(expireAt);
+      if (expireInfo.isExpired) {
+        displayStatus = 'expired';
+      }
+    }
+    
     const colors = {
       active: 'bg-green-100 text-green-800 border border-green-200',
       inactive: 'bg-gray-100 text-gray-800 border border-gray-200',
@@ -358,10 +367,10 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     return (
       <span
         className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full shadow-sm ${
-          colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border border-gray-200'
+          colors[displayStatus as keyof typeof colors] || 'bg-gray-100 text-gray-800 border border-gray-200'
         }`}
       >
-        {labels[status as keyof typeof labels] || status || '未知'}
+        {labels[displayStatus as keyof typeof labels] || displayStatus || '未知'}
       </span>
     );
   };
@@ -752,7 +761,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                           <option value="expired">已過期</option>
                         </select>
                       ) : (
-                        getStatusBadge(member.status)
+                        getStatusBadge(member.status, member.expireAt)
                       )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -931,7 +940,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">狀態</label>
-                    <p className="mt-2">{getStatusBadge(selectedMember.status)}</p>
+                    <p className="mt-2">{getStatusBadge(selectedMember.status, selectedMember.expireAt)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">開始時間</label>
@@ -1151,7 +1160,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                     <div className="flex items-center space-x-2">
                       <span className="text-xs text-gray-500">狀態:</span>
                       <span className="text-sm font-semibold text-gray-900">
-                        {getStatusBadge(deletingMember.status)}
+                        {getStatusBadge(deletingMember.status, deletingMember.expireAt)}
                       </span>
                     </div>
                   </div>
