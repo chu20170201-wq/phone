@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { Phone, Users, Clock, TrendingUp, AlertTriangle, Shield, CheckCircle, Copy, Check } from 'lucide-react';
+import { Phone, Users, Clock, TrendingUp, AlertTriangle, Shield, CheckCircle, Copy, Check, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 // 安全的日期格式化函數
@@ -76,9 +76,14 @@ export default function RecentDataReport() {
   const [recordLimit, setRecordLimit] = useState<number>(10);
   const [memberLimit, setMemberLimit] = useState<number>(10);
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    type: 'trial7' | 'member30' | 'delete';
+    record: PhoneRecord;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // 獲取最新的電話記錄
-  const { data: recentRecords, isLoading: loadingRecords } = useQuery({
+  const { data: recentRecords, isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
     queryKey: ['recent-records', recordLimit],
     queryFn: async () => {
       const res = await axios.get(`/api/recent-data?type=records&limit=${recordLimit}`);
@@ -98,6 +103,93 @@ export default function RecentDataReport() {
     staleTime: 1 * 60 * 1000, // 1 分钟内数据视为新鲜
     refetchInterval: 30000, // 每 30 秒自動刷新（最新数据保持 30 秒刷新）
   });
+
+  // 將指定 User ID 設為試用 7 天（全局會員）
+  const handleSetTrial7Days = async (userId: string | undefined | null) => {
+    if (!userId) {
+      alert('此筆紀錄沒有 User ID，無法設定試用。');
+      return;
+    }
+
+    try {
+      const res = await axios.post('/api/members', {
+        action: 'ensure-member',
+        userId,
+      });
+
+      if (!res.data?.success) {
+        alert('設定試用失敗：' + (res.data?.error || '未知錯誤'));
+        return;
+      }
+
+      alert('已為此 User ID 設定 7 天試用（如已是會員則不重複建立）。');
+    } catch (error) {
+      console.error('設定試用失敗:', error);
+      alert('設定試用失敗，請稍後重試');
+    }
+  };
+
+  // 將指定 User ID 設為會員 30 天（全局會員）
+  const handleSetMember30Days = async (userId: string | undefined | null) => {
+    if (!userId) {
+      alert('此筆紀錄沒有 User ID，無法設定會員天數。');
+      return;
+    }
+
+    try {
+      // 先查詢是否已有會員
+      const memberRes = await axios.get('/api/members', {
+        params: { userId },
+      });
+      let member = memberRes.data?.data as (Member & { rowNumber: number }) | null;
+
+      // 如果沒有會員，先建立（預設 7 天試用）
+      if (!member) {
+        const ensureRes = await axios.post('/api/members', {
+          action: 'ensure-member',
+          userId,
+        });
+        if (!ensureRes.data?.success) {
+          alert('建立會員失敗：' + (ensureRes.data?.error || '未知錯誤'));
+          return;
+        }
+        member = ensureRes.data?.data?.member as Member & { rowNumber: number };
+      }
+
+      if (!member || !member.rowNumber) {
+        alert('找不到對應的會員行號，無法加值 30 天。');
+        return;
+      }
+
+      // 對該會員加值 30 天
+      const addValueRes = await axios.post('/api/members', {
+        action: 'add-value',
+        rowNumber: member.rowNumber,
+        option: '30days',
+      });
+
+      if (!addValueRes.data?.success) {
+        alert('加值 30 天失敗：' + (addValueRes.data?.error || '未知錯誤'));
+        return;
+      }
+
+      alert('已為此 User ID 加值 30 天（若原本有到期日，則在原到期日上延長）。');
+    } catch (error) {
+      console.error('設定 30 天會員失敗:', error);
+      alert('設定 30 天會員失敗，請稍後重試');
+    }
+  };
+
+  // 刪除單筆電話記錄（含關聯風險名單）
+  const handleDeleteRecord = async (rowNumber: number) => {
+    try {
+      await axios.delete(`/api/phone-records?rowNumber=${rowNumber}`);
+      await refetchRecords();
+    } catch (error) {
+      console.error('刪除電話記錄失敗:', error);
+      alert('刪除失敗，請稍後重試');
+    }
+  };
 
   const getRiskLevelIcon = (riskLevel: string) => {
     switch (riskLevel) {
@@ -228,6 +320,9 @@ export default function RecentDataReport() {
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                       名稱
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -252,7 +347,7 @@ export default function RecentDataReport() {
                         {record.userId ? (
                           <div className="flex items-center space-x-2">
                             <span className="font-mono text-xs text-gray-500">
-                              {truncateUserId(record.userId)}
+                              {record.userId}
                             </span>
                             <button
                               onClick={async () => {
@@ -280,6 +375,32 @@ export default function RecentDataReport() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {record.displayName || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setPendingAction({ type: 'trial7', record })}
+                            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                            title="設為試用 7 天（全局會員）"
+                          >
+                            試用7天
+                          </button>
+                          <button
+                            onClick={() => setPendingAction({ type: 'member30', record })}
+                            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors duration-150"
+                            title="加值 30 天（全局會員）"
+                          >
+                            會員30天
+                          </button>
+                          <button
+                            onClick={() => setPendingAction({ type: 'delete', record })}
+                            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                            title="刪除此筆記錄及關聯風險資料"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            刪除
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -368,7 +489,7 @@ export default function RecentDataReport() {
                         {member.userId ? (
                           <div className="flex items-center space-x-2">
                             <span className="font-mono text-xs text-gray-500">
-                              {truncateUserId(member.userId)}
+                              {member.userId}
                             </span>
                             <button
                               onClick={async () => {
@@ -416,6 +537,86 @@ export default function RecentDataReport() {
           )}
         </div>
       </div>
+      {/* 操作確認模態框 */}
+      {pendingAction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm h-full w-full z-50 animate-fade-in flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 animate-slide-up">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">
+                {pendingAction.type === 'trial7'
+                  ? '確認設定試用 7 天'
+                  : pendingAction.type === 'member30'
+                  ? '確認加值會員 30 天'
+                  : '確認刪除電話記錄'}
+              </h3>
+              <button
+                onClick={() => !actionLoading && setPendingAction(null)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-3 text-sm text-gray-700">
+              <p>
+                User ID：{' '}
+                <span className="font-mono font-semibold">
+                  {pendingAction.record.userId || '無'}
+                </span>
+              </p>
+              <p>
+                電話號碼：{' '}
+                <span className="font-mono font-semibold">
+                  {pendingAction.record.phoneNumber || '-'}
+                </span>
+              </p>
+              {pendingAction.type === 'trial7' && (
+                <p>此操作會在會員管理中為該 User ID 建立或更新為「試用 7 天」，並全局生效。</p>
+              )}
+              {pendingAction.type === 'member30' && (
+                <p>
+                  此操作會在會員管理中為該 User ID 加值「30 天」，沒有會員時會先建立，再加值。
+                </p>
+              )}
+              {pendingAction.type === 'delete' && (
+                <p>
+                  此操作會清空這筆電話記錄，並刪除風險名單中同電話或同 User ID 的相關紀錄，且無法復原。
+                </p>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => !actionLoading && setPendingAction(null)}
+                className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                disabled={actionLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={async () => {
+                  if (!pendingAction) return;
+                  setActionLoading(true);
+                  try {
+                    if (pendingAction.type === 'trial7') {
+                      await handleSetTrial7Days(pendingAction.record.userId);
+                    } else if (pendingAction.type === 'member30') {
+                      await handleSetMember30Days(pendingAction.record.userId);
+                    } else if (pendingAction.type === 'delete') {
+                      await handleDeleteRecord(pendingAction.record.rowNumber);
+                    }
+                  } finally {
+                    setActionLoading(false);
+                    setPendingAction(null);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-md transition-colors disabled:opacity-50 bg-blue-600 hover:bg-blue-700"
+                disabled={actionLoading}
+              >
+                {actionLoading ? '處理中…' : '確認'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

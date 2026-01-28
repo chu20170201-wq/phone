@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { AlertTriangle, Shield, CheckCircle, ExternalLink, Copy, Check } from 'lucide-react';
+import { AlertTriangle, Shield, CheckCircle, ExternalLink, Copy, Check, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 // 安全的日期格式化函数
@@ -40,7 +40,8 @@ interface PhoneRecord {
 }
 
 interface PhoneRecordsTableProps {
-  searchQuery: string;
+  searchQuery?: string;
+  onNavigateToMember?: (userId: string) => void;
 }
 
 // 縮短 User ID 顯示
@@ -75,7 +76,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProps) {
+export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: PhoneRecordsTableProps) {
   const [selectedRecord, setSelectedRecord] = useState<PhoneRecord | null>(null);
   const [riskLevelFilter, setRiskLevelFilter] = useState<string>('all'); // 'all', 'high', 'medium', 'low'
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
@@ -97,7 +98,8 @@ export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProp
       const res = await axios.get(url);
       return res.data.data as PhoneRecord[];
     },
-    refetchInterval: 30000,
+    staleTime: 2 * 60 * 1000, // 2 分钟内数据视为新鲜
+    refetchInterval: 60000, // 每 60 秒自动刷新（从 30 秒改为 60 秒，减少请求）
   });
 
   if (isLoading) {
@@ -149,6 +151,34 @@ export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProp
       setTimeout(() => setCopiedUserId(null), 2000);
     } else {
       alert('複製失敗，請手動複製');
+    }
+  };
+
+  // 處理添加到會員管理
+  const handleAddToMembers = async (userId: string) => {
+    if (!userId) {
+      alert('User ID 為空，無法添加到會員管理');
+      return;
+    }
+
+    try {
+      // 調用 API 確保會員存在（如果不存在則創建）
+      const response = await axios.post('/api/members', {
+        action: 'ensure-member',
+        userId: userId,
+      });
+
+      if (response.data.success) {
+        // 導航到會員管理頁面
+        if (onNavigateToMember) {
+          onNavigateToMember(userId);
+        }
+      } else {
+        alert('添加到會員管理失敗：' + (response.data.error || '未知錯誤'));
+      }
+    } catch (error) {
+      console.error('添加到會員管理失敗:', error);
+      alert('添加到會員管理失敗，請稍後重試');
     }
   };
 
@@ -315,7 +345,7 @@ export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProp
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
                       <span className="font-mono text-xs" title={record.userId || '無'}>
-                        {record.userId ? truncateUserId(record.userId) : '無'}
+                        {record.userId || '無'}
                       </span>
                       {record.userId && (
                         <>
@@ -364,7 +394,22 @@ export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProp
                         )}
                       </div>
                     ) : (
-                      <span className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full">非會員</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full">非會員</span>
+                        {record.userId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToMembers(record.userId);
+                            }}
+                            className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 flex items-center space-x-1 shadow-sm hover:shadow-md"
+                            title="添加到會員管理（7天試用）"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            <span>設為試用</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -410,7 +455,7 @@ export default function PhoneRecordsTable({ searchQuery }: PhoneRecordsTableProp
       {/* 詳情模態框 */}
       {selectedRecord && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-10 mx-auto p-6 border-2 border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white animate-slide-up">
+          <div className="relative top-10 mx-auto p-6 border-2 border-gray-200 w-11/12 md:max-w-2xl shadow-2xl rounded-2xl bg-white animate-slide-up">
             <div className="mt-2">
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                 <h3 className="text-2xl font-bold text-gray-900">記錄詳情</h3>

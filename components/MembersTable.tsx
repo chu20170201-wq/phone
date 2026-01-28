@@ -81,6 +81,16 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
   const [searchUserId, setSearchUserId] = useState<string>('');
+  const [detailForm, setDetailForm] = useState<{
+    lineName: string;
+    status: string;
+    pendingDuration: 'none' | 'trial7days' | '30days';
+  }>({
+    lineName: '',
+    status: 'active',
+    pendingDuration: 'none',
+  });
+  const [detailSaving, setDetailSaving] = useState(false);
   
   // 筛选状态
   const [expireFilter, setExpireFilter] = useState<string>('all'); // 'all', 'expired', 'active'
@@ -136,6 +146,17 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       }
     }
   }, [selectedUserId, data, onUserIdProcessed, refetch, queryClient]);
+
+  // 當開啟會員詳情時，初始化詳情表單
+  React.useEffect(() => {
+    if (selectedMember) {
+      setDetailForm({
+        lineName: selectedMember.displayName || selectedMember.lineName || '',
+        status: selectedMember.status || 'active',
+        pendingDuration: 'none',
+      });
+    }
+  }, [selectedMember]);
 
   if (isLoading) {
     return (
@@ -461,11 +482,11 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   };
 
   const valueTimeOptions = [
-    { value: '30days', label: '30 天（一個月）' },
-    { value: '90days', label: '90 天（三個月）' },
-    { value: 'halfyear', label: '半年' },
-    { value: 'oneyear', label: '一年' },
-    { value: 'trial7days', label: '試用期 7 天' },
+    { value: '30days', label: '30 天（一個月） / 500 元' },
+    { value: '90days', label: '90 天（三個月） / 1,350 元' },
+    { value: 'halfyear', label: '半年 / 2,400 元' },
+    { value: 'oneyear', label: '一年 / 4,200 元' },
+    { value: 'trial7days', label: '試用期 7 天 / 免費' },
   ];
 
   const handleDelete = async () => {
@@ -480,6 +501,43 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     } catch (error) {
       console.error('刪除失敗:', error);
       alert('刪除失敗，請稍後重試');
+    }
+  };
+
+  // 在會員詳情中儲存修改（LINE 名稱、狀態、加值時間）
+  const handleDetailSave = async () => {
+    if (!selectedMember || detailSaving) return;
+
+    try {
+      setDetailSaving(true);
+
+      // 先處理加值時間（如果有選）
+      if (detailForm.pendingDuration !== 'none') {
+        await axios.post('/api/members', {
+          action: 'add-value',
+          rowNumber: selectedMember.rowNumber,
+          option: detailForm.pendingDuration,
+        });
+      }
+
+      // 更新狀態與 LINE 名稱（保留 plan 公式邏輯由後端處理）
+      await axios.put('/api/members', {
+        rowNumber: selectedMember.rowNumber,
+        plan: selectedMember.plan,
+        status: detailForm.status,
+        lineName: detailForm.lineName.trim() || undefined,
+      });
+
+      // 刷新列表
+      await queryClient.invalidateQueries({ queryKey: ['members'] });
+
+      // 關閉詳情
+      setSelectedMember(null);
+    } catch (error) {
+      console.error('儲存會員詳情失敗:', error);
+      alert('儲存失敗，請稍後重試');
+    } finally {
+      setDetailSaving(false);
     }
   };
 
@@ -711,9 +769,9 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                               </div>
                             </button>
                             <div className="flex items-center space-x-2 mt-1">
-                              <span className="font-mono text-xs text-gray-500 truncate max-w-[120px]">
+                              <span className="font-mono text-xs text-gray-500">
                                 {member.userId || '無'}
-                      </span>
+                              </span>
                       {member.userId && (
                         <button
                                   onClick={(e) => {
@@ -878,8 +936,8 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 詳情模態框 */}
       {selectedMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-10 mx-auto p-6 border-2 border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white animate-slide-up">
-            <div className="mt-2">
+          <div className="relative top-10 mx-auto p-4 border border-gray-200 w-11/12 md:max-w-xl shadow-2xl rounded-2xl bg-white animate-slide-up">
+            <div>
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                 <h3 className="text-2xl font-bold text-gray-900">會員詳情</h3>
                 <button
@@ -917,38 +975,76 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
               </div>
 
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">行號</label>
                     <p className="mt-2 text-sm font-semibold text-gray-900">{selectedMember.rowNumber}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">LINE 名稱</label>
-                    <p className="mt-2 text-sm font-semibold text-gray-900">
-                      {selectedMember.displayName || selectedMember.lineName || '-'}
-                    </p>
+                    <input
+                      type="text"
+                      value={detailForm.lineName}
+                      onChange={(e) =>
+                        setDetailForm((prev) => ({ ...prev, lineName: e.target.value }))
+                      }
+                      placeholder="輸入或修改 LINE 名稱"
+                      className="mt-2 w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">LINE 名稱</label>
-                    <p className="mt-2 text-sm font-semibold text-gray-900">
-                      {selectedMember.displayName || selectedMember.lineName || '-'}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">方案</label>
-                    <p className="mt-2">{getPlanBadge(selectedMember.plan, selectedMember.expireAt)}</p>
+                    <div className="mt-2 flex items-center space-x-2">
+                      {getPlanBadge(selectedMember.plan, selectedMember.expireAt)}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDetailForm((prev) => ({ ...prev, pendingDuration: 'trial7days' }))
+                        }
+                        className={`px-2 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                          detailForm.pendingDuration === 'trial7days'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        試用7天
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDetailForm((prev) => ({ ...prev, pendingDuration: '30days' }))
+                        }
+                        className={`px-2 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                          detailForm.pendingDuration === '30days'
+                            ? 'border-purple-500 bg-purple-50 text-purple-700'
+                            : 'border-gray-200 text-gray-600 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                      >
+                        會員30天
+                      </button>
+                    </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">狀態</label>
-                    <p className="mt-2">{getStatusBadge(selectedMember.status, selectedMember.expireAt)}</p>
+                    <select
+                      value={detailForm.status}
+                      onChange={(e) =>
+                        setDetailForm((prev) => ({ ...prev, status: e.target.value }))
+                      }
+                      className="mt-2 w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="active">啟用</option>
+                      <option value="inactive">停用</option>
+                      <option value="expired">已過期</option>
+                    </select>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">開始時間</label>
                     <p className="mt-2 text-sm font-semibold text-gray-900">
                       {selectedMember.startAt || '-'}
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">到期時間</label>
                     <div className="mt-2">
                       {(() => {
@@ -977,7 +1073,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                     </div>
                   </div>
                   {selectedMember.paymentMethod && (
-                    <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="bg-gray-50 rounded-lg p-3">
                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">繳費方式</label>
                       <p className="mt-2 text-sm font-semibold text-gray-900">
                         {selectedMember.paymentMethod}
@@ -985,7 +1081,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                     </div>
                   )}
                   {selectedMember.paymentTime && (
-                    <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="bg-gray-50 rounded-lg p-3">
                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">繳費時間</label>
                       <p className="mt-2 text-sm font-semibold text-gray-900">
                         {selectedMember.paymentTime}
@@ -994,12 +1090,20 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                   )}
                 </div>
               </div>
-              <div className="mt-8 flex justify-end border-t border-gray-200 pt-6">
+              <div className="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-6">
                 <button
                   onClick={() => setSelectedMember(null)}
-                  className="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 font-semibold shadow-lg transition-all duration-200"
+                  className="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold transition-all duration-200"
+                  disabled={detailSaving}
                 >
                   關閉
+                </button>
+                <button
+                  onClick={handleDetailSave}
+                  disabled={detailSaving}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 font-semibold shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {detailSaving ? '儲存中…' : '儲存'}
                 </button>
               </div>
             </div>
@@ -1010,16 +1114,16 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 加值時間模態框 */}
       {showAddValueModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-10 mx-auto p-6 border-2 border-gray-200 w-11/12 md:w-2/3 lg:w-1/2 shadow-2xl rounded-2xl bg-white animate-slide-up">
-            <div className="mt-2">
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+          <div className="relative top-10 mx-auto p-4 border border-gray-200 w-11/12 md:max-w-lg shadow-2xl rounded-2xl bg-white animate-slide-up">
+            <div>
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">加值時間</h3>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <h3 className="text-xl font-bold text-gray-900">加值時間</h3>
+                    <p className="text-xs text-gray-500 mt-1">
                       {showAddValueModal.displayName || showAddValueModal.lineName || '會員'}
                     </p>
                   </div>
@@ -1035,30 +1139,30 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <p className="text-sm text-blue-800 font-medium">
+              <div className="space-y-3">
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <p className="text-xs text-blue-800 font-medium">
                     💡 提示：如果會員已有到期時間，加值會從到期時間開始延長；如果沒有或已過期，則從今天開始計算。
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     選擇加值時間：
                   </label>
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-2">
                     {valueTimeOptions.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => setSelectedValueOption(option.value)}
-                        className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 text-left ${
+                        className={`px-3 py-2 rounded-lg border-2 transition-all duration-200 text-left ${
                           selectedValueOption === option.value
                             ? 'border-purple-500 bg-purple-50 shadow-md'
                             : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-50/50'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-900">{option.label}</span>
+                          <span className="text-sm font-semibold text-gray-900">{option.label}</span>
                           {selectedValueOption === option.value && (
                             <CheckCircle className="w-5 h-5 text-purple-500" />
                           )}
@@ -1069,7 +1173,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                 </div>
 
                 {showAddValueModal.expireAt && (
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500 mb-1">當前到期時間</p>
                     <p className="text-sm font-semibold text-gray-900">
                       {formatExpireDate(showAddValueModal.expireAt).formatted}
@@ -1078,7 +1182,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                 )}
               </div>
 
-              <div className="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-6">
+              <div className="mt-5 flex justify-end space-x-3 border-t border-gray-200 pt-4">
                 <button
                   onClick={() => {
                     setShowAddValueModal(null);
