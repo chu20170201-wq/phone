@@ -15,6 +15,24 @@ type Tab = 'records' | 'recent' | 'members' | 'stats' | 'risks';
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('records');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMemberUserId, setSelectedMemberUserId] = useState<string | null>(null);
+
+  // 記錄哪些分頁已經掛載過，避免每次切換都重新掛載造成卡頓
+  const [mountedTabs, setMountedTabs] = useState<Record<Tab, boolean>>({
+    records: true,
+    recent: false,
+    members: false,
+    stats: false,
+    risks: false,
+  });
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setMountedTabs((prev) => ({
+      ...prev,
+      [tab]: true,
+    }));
+  };
 
   return (
     <>
@@ -51,7 +69,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex space-x-1">
               <button
-                onClick={() => setActiveTab('records')}
+                onClick={() => handleTabChange('records')}
                 className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
                   activeTab === 'records'
                     ? 'border-blue-500 text-blue-600 bg-blue-50/50'
@@ -62,7 +80,7 @@ export default function Home() {
                 電話查詢記錄
               </button>
               <button
-                onClick={() => setActiveTab('recent')}
+                onClick={() => handleTabChange('recent')}
                 className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
                   activeTab === 'recent'
                     ? 'border-blue-500 text-blue-600 bg-blue-50/50'
@@ -73,7 +91,7 @@ export default function Home() {
                 最新數據
               </button>
               <button
-                onClick={() => setActiveTab('members')}
+                onClick={() => handleTabChange('members')}
                 className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
                   activeTab === 'members'
                     ? 'border-blue-500 text-blue-600 bg-blue-50/50'
@@ -84,7 +102,7 @@ export default function Home() {
                 會員管理
               </button>
               <button
-                onClick={() => setActiveTab('stats')}
+                onClick={() => handleTabChange('stats')}
                 className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
                   activeTab === 'stats'
                     ? 'border-blue-500 text-blue-600 bg-blue-50/50'
@@ -95,7 +113,7 @@ export default function Home() {
                 數據統計
               </button>
               <button
-                onClick={() => setActiveTab('risks')}
+                onClick={() => handleTabChange('risks')}
                 className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
                   activeTab === 'risks'
                     ? 'border-blue-500 text-blue-600 bg-blue-50/50'
@@ -123,12 +141,45 @@ export default function Home() {
           )}
 
           {/* 標籤頁內容 */}
-          <div className="animate-fade-in">
-            {activeTab === 'records' && <PhoneRecordsTable searchQuery={searchQuery} />}
-            {activeTab === 'recent' && <RecentDataReport />}
-            {activeTab === 'members' && <MembersTable />}
-            {activeTab === 'stats' && <StatsCards />}
-            {activeTab === 'risks' && <RiskListTable />}
+          <div className="relative">
+            {mountedTabs.records && (
+              <div className={activeTab === 'records' ? 'animate-fade-in' : 'hidden'}>
+                <PhoneRecordsTable
+                  searchQuery={searchQuery}
+                  onNavigateToMember={(userId) => {
+                    setSelectedMemberUserId(userId);
+                    handleTabChange('members');
+                  }}
+                />
+              </div>
+            )}
+
+            {mountedTabs.recent && (
+              <div className={activeTab === 'recent' ? 'animate-fade-in' : 'hidden'}>
+                <RecentDataReport />
+              </div>
+            )}
+
+            {mountedTabs.members && (
+              <div className={activeTab === 'members' ? 'animate-fade-in' : 'hidden'}>
+                <MembersTable
+                  selectedUserId={selectedMemberUserId}
+                  onUserIdProcessed={() => setSelectedMemberUserId(null)}
+                />
+              </div>
+            )}
+
+            {mountedTabs.stats && (
+              <div className={activeTab === 'stats' ? 'animate-fade-in' : 'hidden'}>
+                <StatsCards />
+              </div>
+            )}
+
+            {mountedTabs.risks && (
+              <div className={activeTab === 'risks' ? 'animate-fade-in' : 'hidden'}>
+                <RiskListTable />
+              </div>
+            )}
           </div>
         </main>
       </div>
