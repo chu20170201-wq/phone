@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getPhoneRecords, getRecordsByPhone, getRecordsByUserId, syncMembers } from '@/lib/googleSheets';
+import { getPhoneRecords, getRecordsByPhone, getRecordsByUserId, syncMembers, deletePhoneRecordAndRelated } from '@/lib/googleSheets';
 
 export default async function handler(
   req: NextApiRequest,
@@ -52,6 +52,28 @@ export default async function handler(
         message: '會員同步完成',
         data: syncResult
       });
+    }
+
+    if (req.method === 'DELETE') {
+      const { rowNumber } = req.query;
+
+      if (!rowNumber) {
+        return res.status(400).json({
+          success: false,
+          error: '缺少必要參數：rowNumber',
+        });
+      }
+
+      const rowNum = parseInt(rowNumber as string, 10);
+      if (isNaN(rowNum) || rowNum < 2) {
+        return res.status(400).json({
+          success: false,
+          error: '無效的行號',
+        });
+      }
+
+      await deletePhoneRecordAndRelated(rowNum);
+      return res.status(200).json({ success: true, message: '刪除成功' });
     }
 
     return res.status(405).json({ success: false, error: 'Method not allowed' });
