@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { Phone, Users, Clock, TrendingUp, AlertTriangle, Shield, CheckCircle, Copy, Check, Trash2 } from 'lucide-react';
@@ -73,6 +73,7 @@ interface Member {
 }
 
 export default function RecentDataReport() {
+  const queryClient = useQueryClient();
   const [recordLimit, setRecordLimit] = useState<number>(10);
   const [memberLimit, setMemberLimit] = useState<number>(10);
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
@@ -122,6 +123,8 @@ export default function RecentDataReport() {
         return;
       }
 
+      await queryClient.invalidateQueries({ queryKey: ['members'] });
+      await queryClient.invalidateQueries({ queryKey: ['recent-members'] });
       alert('已為此 User ID 設定 7 天試用（如已是會員則不重複建立）。');
     } catch (error) {
       console.error('設定試用失敗:', error);
@@ -173,6 +176,8 @@ export default function RecentDataReport() {
         return;
       }
 
+      await queryClient.invalidateQueries({ queryKey: ['members'] });
+      await queryClient.invalidateQueries({ queryKey: ['recent-members'] });
       alert('已為此 User ID 加值 30 天（若原本有到期日，則在原到期日上延長）。');
     } catch (error) {
       console.error('設定 30 天會員失敗:', error);

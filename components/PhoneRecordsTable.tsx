@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { AlertTriangle, Shield, CheckCircle, ExternalLink, Copy, Check, UserPlus } from 'lucide-react';
@@ -77,6 +77,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: PhoneRecordsTableProps) {
+  const queryClient = useQueryClient();
   const [selectedRecord, setSelectedRecord] = useState<PhoneRecord | null>(null);
   const [riskLevelFilter, setRiskLevelFilter] = useState<string>('all'); // 'all', 'high', 'medium', 'low'
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
@@ -169,7 +170,9 @@ export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: P
       });
 
       if (response.data.success) {
-        // 導航到會員管理頁面
+        await queryClient.invalidateQueries({ queryKey: ['members'] });
+        await queryClient.invalidateQueries({ queryKey: ['recent-members'] });
+        await queryClient.invalidateQueries({ queryKey: ['phone-records'] });
         if (onNavigateToMember) {
           onNavigateToMember(userId);
         }

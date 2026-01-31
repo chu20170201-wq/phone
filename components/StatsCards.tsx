@@ -9,7 +9,8 @@ export default function StatsCards() {
       const res = await axios.get('/api/stats');
       return res.data.data;
     },
-    refetchInterval: 30000, // 每30秒刷新一次
+    staleTime: 2 * 60 * 1000, // 2 分钟内数据视为新鲜
+    refetchInterval: 60000, // 每 60 秒刷新一次（减少请求频率）
   });
 
   if (isLoading) {

@@ -136,7 +136,8 @@ export default function RiskListTable() {
       const res = await axios.get(url);
       return res.data.data as RiskRecord[];
     },
-    refetchInterval: 30000,
+    staleTime: 2 * 60 * 1000, // 2 分钟内数据视为新鲜
+    refetchInterval: 60000, // 每 60 秒自动刷新
   });
 
   // 處理複製 User ID

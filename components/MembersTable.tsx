@@ -70,10 +70,18 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   const queryClient = useQueryClient();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [editForm, setEditForm] = useState<{ plan: string; status: string; lineName: string }>({ 
-    plan: '', 
-    status: '', 
-    lineName: '' 
+  const [editForm, setEditForm] = useState<{
+    plan: string;
+    status: string;
+    lineName: string;
+    startAt: string;
+    expireAt: string;
+  }>({
+    plan: '',
+    status: '',
+    lineName: '',
+    startAt: '',
+    expireAt: '',
   });
   const [showAddValueModal, setShowAddValueModal] = useState<Member | null>(null);
   const [selectedValueOption, setSelectedValueOption] = useState<string>('');
@@ -85,10 +93,14 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     lineName: string;
     status: string;
     pendingDuration: 'none' | 'trial7days' | '30days';
+    startAt: string;
+    expireAt: string;
   }>({
     lineName: '',
     status: 'active',
     pendingDuration: 'none',
+    startAt: '',
+    expireAt: '',
   });
   const [detailSaving, setDetailSaving] = useState(false);
   
@@ -147,6 +159,21 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     }
   }, [selectedUserId, data, onUserIdProcessed, refetch, queryClient]);
 
+  // 將 yyyy/M/d 或 yyyy-MM-dd 轉成 input type="date" 用的 yyyy-MM-dd
+  const toDateInputValue = (s: string | undefined | null): string => {
+    if (!s || !s.trim()) return '';
+    const t = s.trim();
+    if (t.includes('-')) return t.split('T')[0];
+    if (t.includes('/')) {
+      const parts = t.split('/');
+      const y = parts[0] ?? '';
+      const m = (parts[1] ?? '').padStart(2, '0');
+      const d = (parts[2] ?? '').padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return '';
+  };
+
   // 當開啟會員詳情時，初始化詳情表單
   React.useEffect(() => {
     if (selectedMember) {
@@ -154,6 +181,8 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
         lineName: selectedMember.displayName || selectedMember.lineName || '',
         status: selectedMember.status || 'active',
         pendingDuration: 'none',
+        startAt: toDateInputValue(selectedMember.startAt),
+        expireAt: toDateInputValue(selectedMember.expireAt),
       });
     }
   }, [selectedMember]);
@@ -428,10 +457,12 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
 
   const handleEdit = (member: Member) => {
     setEditingMember(member);
-    setEditForm({ 
-      plan: member.plan || '', 
+    setEditForm({
+      plan: member.plan || '',
       status: member.status || '',
-      lineName: member.lineName || member.displayName || ''
+      lineName: member.lineName || member.displayName || '',
+      startAt: toDateInputValue(member.startAt),
+      expireAt: toDateInputValue(member.expireAt),
     });
   };
 
@@ -443,13 +474,14 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
         rowNumber: editingMember.rowNumber,
         plan: editForm.plan,
         status: editForm.status,
-        lineName: editForm.lineName.trim() || undefined, // 如果為空則不更新
+        lineName: editForm.lineName.trim() || undefined,
+        startAt: editForm.startAt.trim() || undefined,
+        expireAt: editForm.expireAt.trim() || undefined,
       });
-      
-      // 刷新數據
+
       queryClient.invalidateQueries({ queryKey: ['members'] });
       setEditingMember(null);
-      setEditForm({ plan: '', status: '', lineName: '' });
+      setEditForm({ plan: '', status: '', lineName: '', startAt: '', expireAt: '' });
     } catch (error) {
       console.error('更新失敗:', error);
       alert('更新失敗，請稍後重試');
@@ -458,7 +490,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
 
   const handleCancelEdit = () => {
     setEditingMember(null);
-    setEditForm({ plan: '', status: '', lineName: '' });
+    setEditForm({ plan: '', status: '', lineName: '', startAt: '', expireAt: '' });
   };
 
   const handleAddValue = async () => {
@@ -520,12 +552,14 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
         });
       }
 
-      // 更新狀態與 LINE 名稱（保留 plan 公式邏輯由後端處理）
+      // 更新狀態、LINE 名稱、開始/到期時間（保留 plan 公式邏輯由後端處理）
       await axios.put('/api/members', {
         rowNumber: selectedMember.rowNumber,
         plan: selectedMember.plan,
         status: detailForm.status,
         lineName: detailForm.lineName.trim() || undefined,
+        startAt: detailForm.startAt.trim() || undefined,
+        expireAt: detailForm.expireAt.trim() || undefined,
       });
 
       // 刷新列表
@@ -823,22 +857,61 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                       )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex flex-col">
-                        <span className={expireInfo.isExpired ? 'text-red-600 font-semibold' : ''}>
-                          {expireInfo.formatted}
-                        </span>
-                        {expireInfo.daysLeft !== null && (
-                          <span className={`text-xs mt-1 ${
-                            expireInfo.isExpired 
-                              ? 'text-red-500' 
-                              : expireInfo.daysLeft <= 30 
-                                ? 'text-orange-500' 
-                                : 'text-gray-500'
-                          }`}>
-                            {expireInfo.isExpired 
-                              ? `已過期 ${expireInfo.daysLeft} 天` 
-                              : `剩餘 ${expireInfo.daysLeft} 天`}
-                          </span>
+                      <div className="flex flex-col gap-1.5">
+                        {isEditing ? (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-gray-500 shrink-0">開始</label>
+                              <input
+                                type="date"
+                                value={editForm.startAt}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({ ...prev, startAt: e.target.value }))
+                                }
+                                className="px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-gray-500 shrink-0">到期</label>
+                              <input
+                                type="date"
+                                value={editForm.expireAt}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({ ...prev, expireAt: e.target.value }))
+                                }
+                                className="px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                              />
+                            </div>
+                            {editForm.expireAt && (() => {
+                              const info = formatExpireDate(editForm.expireAt);
+                              return info.daysLeft !== null ? (
+                                <span className={`text-xs ${
+                                  info.isExpired ? 'text-red-500' : info.daysLeft <= 30 ? 'text-orange-500' : 'text-gray-500'
+                                }`}>
+                                  {info.isExpired ? `已過期 ${info.daysLeft} 天` : `剩餘 ${info.daysLeft} 天`}
+                                </span>
+                              ) : null;
+                            })()}
+                          </>
+                        ) : (
+                          <>
+                            <span className={expireInfo.isExpired ? 'text-red-600 font-semibold' : ''}>
+                              {expireInfo.formatted}
+                            </span>
+                            {expireInfo.daysLeft !== null && (
+                              <span className={`text-xs mt-1 ${
+                                expireInfo.isExpired
+                                  ? 'text-red-500'
+                                  : expireInfo.daysLeft <= 30
+                                    ? 'text-orange-500'
+                                    : 'text-gray-500'
+                              }`}>
+                                {expireInfo.isExpired
+                                  ? `已過期 ${expireInfo.daysLeft} 天`
+                                  : `剩餘 ${expireInfo.daysLeft} 天`}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                   </td>
@@ -1040,37 +1113,41 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">開始時間</label>
-                    <p className="mt-2 text-sm font-semibold text-gray-900">
-                      {selectedMember.startAt || '-'}
-                    </p>
+                    <input
+                      type="date"
+                      value={detailForm.startAt}
+                      onChange={(e) =>
+                        setDetailForm((prev) => ({ ...prev, startAt: e.target.value }))
+                      }
+                      className="mt-2 w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">到期時間</label>
-                    <div className="mt-2">
-                      {(() => {
-                        const expireInfo = formatExpireDate(selectedMember.expireAt);
-                        return (
-                          <>
-                            <p className={`text-sm font-semibold ${expireInfo.isExpired ? 'text-red-600' : ''}`}>
-                              {expireInfo.formatted}
-                            </p>
-                            {expireInfo.daysLeft !== null && (
-                              <p className={`text-xs mt-1 ${
-                                expireInfo.isExpired 
-                                  ? 'text-red-500' 
-                                  : expireInfo.daysLeft <= 30 
-                                    ? 'text-orange-500' 
-                                    : 'text-gray-500'
-                              }`}>
-                                {expireInfo.isExpired 
-                                  ? `已過期 ${expireInfo.daysLeft} 天` 
-                                  : `剩餘 ${expireInfo.daysLeft} 天`}
-                              </p>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
+                    <input
+                      type="date"
+                      value={detailForm.expireAt}
+                      onChange={(e) =>
+                        setDetailForm((prev) => ({ ...prev, expireAt: e.target.value }))
+                      }
+                      className="mt-2 w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {detailForm.expireAt && (() => {
+                      const expireInfo = formatExpireDate(detailForm.expireAt);
+                      return expireInfo.daysLeft !== null ? (
+                        <p className={`text-xs mt-1 ${
+                          expireInfo.isExpired
+                            ? 'text-red-500'
+                            : expireInfo.daysLeft <= 30
+                              ? 'text-orange-500'
+                              : 'text-gray-500'
+                        }`}>
+                          {expireInfo.isExpired
+                            ? `已過期 ${expireInfo.daysLeft} 天`
+                            : `剩餘 ${expireInfo.daysLeft} 天`}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   {selectedMember.paymentMethod && (
                     <div className="bg-gray-50 rounded-lg p-3">
