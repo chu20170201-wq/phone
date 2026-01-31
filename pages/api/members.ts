@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getMembers, getMemberByUserId, updateMember, addValueTime, deleteMemberByRowNumber, ValueTimeOption, syncMembers } from '@/lib/googleSheets';
+import { getMembers, getMemberByUserId, updateMember, addValueTime, deleteMemberByRowNumber, ValueTimeOption, syncMembers, ensureMemberExists } from '@/lib/googleSheets';
 
 export default async function handler(
   req: NextApiRequest,
@@ -37,21 +37,39 @@ export default async function handler(
     }
 
     if (req.method === 'PUT') {
-      const { rowNumber, plan, status, lineName } = req.body;
+      const { rowNumber, plan, status, lineName, startAt, expireAt } = req.body;
 
       if (!rowNumber || !plan || !status) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '缺少必要參數：rowNumber, plan, status' 
+        return res.status(400).json({
+          success: false,
+          error: '缺少必要參數：rowNumber, plan, status',
         });
       }
 
-      await updateMember(rowNumber, plan, status, lineName);
+      await updateMember(rowNumber, plan, status, lineName, startAt, expireAt);
       return res.status(200).json({ success: true, message: '更新成功' });
     }
 
     if (req.method === 'POST') {
-      const { action, rowNumber, option } = req.body;
+      const { action, rowNumber, option, userId } = req.body;
+
+      // 確保會員存在（如果不存在則創建）
+      if (action === 'ensure-member' && userId) {
+        try {
+          const result = await ensureMemberExists(userId as string);
+          return res.status(200).json({ 
+            success: true, 
+            message: result.created ? '會員已創建' : '會員已存在',
+            data: result
+          });
+        } catch (error) {
+          console.error('確保會員存在失敗:', error);
+          return res.status(500).json({ 
+            success: false, 
+            error: error instanceof Error ? error.message : '創建會員失敗' 
+          });
+        }
+      }
 
       if (action === 'add-value' && rowNumber && option) {
         const validOptions: ValueTimeOption[] = ['30days', '90days', 'halfyear', 'oneyear', 'trial7days'];
