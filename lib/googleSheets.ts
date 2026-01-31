@@ -208,6 +208,18 @@ function formatDateForSheets(date: Date): string {
   return `${year}/${month}/${day}`;
 }
 
+// 將前端日期字串（yyyy-MM-dd 或 yyyy/M/d）轉為 yyyy/M/d
+function normalizeDateForSheets(dateStr: string): string {
+  if (!dateStr || !dateStr.trim()) return dateStr;
+  const s = dateStr.trim();
+  if (s.includes('-')) {
+    const [y, m, d] = s.split('-').map(Number);
+    if (y && m && d) return `${y}/${m}/${d}`;
+  }
+  if (s.includes('/')) return s;
+  return dateStr;
+}
+
 // 加值時間功能
 export async function addValueTime(
   rowNumber: number,
@@ -264,16 +276,37 @@ export async function addValueTime(
       if (existingExpireDate > new Date()) {
         newExpireDate = calculateExpireDate(existingExpireDate, option);
       } else {
-        // 如果已過期，從今天開始加值
-        newExpireDate = calculateExpireDate(new Date(), option);
+        // 已過期：從今天開始加值，開始日也改為今天
+        const today = new Date();
+        startDate = today;
+        currentStartAt = formatDateForSheets(today);
+        newExpireDate = calculateExpireDate(today, option);
       }
     } catch {
       // 如果解析失敗，從今天開始加值
       newExpireDate = calculateExpireDate(new Date(), option);
     }
   } else {
-    // 如果沒有到期日期或是試用期，從開始日期加值
-    newExpireDate = calculateExpireDate(startDate, option);
+    // 沒有到期日期，或是選了試用期：從開始日期加值；若已過期則從今天開始
+    let effectiveStart = startDate;
+    if (currentExpireAt && currentExpireAt.trim() !== '') {
+      try {
+        let existingExpireDate: Date;
+        if (currentExpireAt.includes('/')) {
+          const [y, m, d] = currentExpireAt.split('/').map(Number);
+          existingExpireDate = new Date(y, m - 1, d);
+        } else {
+          existingExpireDate = new Date(currentExpireAt);
+        }
+        if (existingExpireDate <= new Date()) {
+          effectiveStart = new Date();
+          currentStartAt = formatDateForSheets(effectiveStart);
+        }
+      } catch {
+        // 解析失敗時維持原 startDate
+      }
+    }
+    newExpireDate = calculateExpireDate(effectiveStart, option);
   }
 
   const newExpireAt = formatDateForSheets(newExpireDate);
@@ -337,99 +370,105 @@ async function cellHasFormula(
   }
 }
 
-// 更新會員信息（方案、狀態、LINE名稱）
+// 更新會員信息（方案、狀態、LINE名稱、開始/到期時間）
 export async function updateMember(
-  rowNumber: number, 
-  plan: string, 
-  status: string, 
-  lineName?: string
+  rowNumber: number,
+  plan: string,
+  status: string,
+  lineName?: string,
+  startAt?: string,
+  expireAt?: string
 ) {
   const sheets = await getSheetsClient();
   const spreadsheetIdEnv = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 
-  // 獲取工作表 ID
   const sheetId = await getSheetId('Members / Subscriptions');
   if (!sheetId) {
     throw new Error('找不到 Members / Subscriptions 工作表');
   }
 
-  // 檢查 B列（plan，索引 1）是否包含公式
-  // rowNumber 是實際行號（從 2 開始，第 1 行是標題）
   if (!spreadsheetIdEnv) {
     throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID 未設置');
   }
   const spreadsheetId = spreadsheetIdEnv as string;
   const planHasFormula = await cellHasFormula(spreadsheetId, sheetId, rowNumber, 1);
 
-  // 更新 Members 工作表的列：
-  // B列=plan(1), C列=status(2), F列=LINE名稱(5)
+  // 先讀取 D、E 列，用於保留或覆寫 startAt / expireAt
+  const readRange = `Members / Subscriptions!D${rowNumber}:E${rowNumber}`;
+  const readResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: readRange,
+  });
+  const existingValues = readResponse.data.values?.[0] || ['', ''];
+  const existingStartAt = existingValues[0] || '';
+  const existingExpireAt = existingValues[1] || '';
+  const resolvedStartAt =
+    startAt !== undefined && startAt !== ''
+      ? normalizeDateForSheets(startAt)
+      : existingStartAt;
+  const resolvedExpireAt =
+    expireAt !== undefined && expireAt !== ''
+      ? normalizeDateForSheets(expireAt)
+      : existingExpireAt;
+
   if (lineName !== undefined && lineName.trim() !== '') {
-    // 同時更新狀態和 LINE 名稱
-    // 如果 B列是公式，不更新 plan，讓公式自動計算
     if (planHasFormula) {
-      // B列是公式，只更新 C列（status）和 F列（lineName），保留公式
+      const data: { range: string; values: string[][] }[] = [
+        { range: `Members / Subscriptions!C${rowNumber}`, values: [[status]] },
+        { range: `Members / Subscriptions!F${rowNumber}`, values: [[lineName.trim()]] },
+      ];
+      if (startAt !== undefined || expireAt !== undefined) {
+        data.push({
+          range: `Members / Subscriptions!D${rowNumber}:E${rowNumber}`,
+          values: [[resolvedStartAt, resolvedExpireAt]],
+        });
+      }
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        requestBody: {
-          valueInputOption: 'RAW',
-          data: [
-            {
-              range: `Members / Subscriptions!C${rowNumber}`,
-              values: [[status]],
-            },
-            {
-              range: `Members / Subscriptions!F${rowNumber}`,
-              values: [[lineName.trim()]],
-            },
-          ],
-        },
+        requestBody: { valueInputOption: 'RAW', data },
       });
     } else {
-      // B列不是公式，可以更新 plan、status 和 lineName
-      // 需要先讀取 D 和 E 列的值（startAt, expireAt）以保持不變
-      const readRange = `Members / Subscriptions!D${rowNumber}:E${rowNumber}`;
-      const readResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: readRange,
-      });
-      
-      const existingValues = readResponse.data.values?.[0] || ['', ''];
-      const startAt = existingValues[0] || '';
-      const expireAt = existingValues[1] || '';
-      
       const range = `Members / Subscriptions!B${rowNumber}:F${rowNumber}`;
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [[plan, status, startAt, expireAt, lineName.trim()]],
+          values: [[plan, status, resolvedStartAt, resolvedExpireAt, lineName.trim()]],
         },
       });
     }
   } else {
-    // 只更新狀態（如果 B列是公式，不更新 plan）
     if (planHasFormula) {
-      // B列是公式，只更新 C列（status），保留公式
-      const range = `Members / Subscriptions!C${rowNumber}`;
-      await sheets.spreadsheets.values.update({
+      const data: { range: string; values: string[][] }[] = [
+        { range: `Members / Subscriptions!C${rowNumber}`, values: [[status]] },
+      ];
+      if (startAt !== undefined || expireAt !== undefined) {
+        data.push({
+          range: `Members / Subscriptions!D${rowNumber}:E${rowNumber}`,
+          values: [[resolvedStartAt, resolvedExpireAt]],
+        });
+      }
+      await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        range,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [[status]],
-        },
+        requestBody: { valueInputOption: 'RAW', data },
       });
     } else {
-      // B列不是公式，可以更新 plan 和 status
-      const range = `Members / Subscriptions!B${rowNumber}:C${rowNumber}`;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range,
-        valueInputOption: 'RAW',
-        requestBody: {
+      const data: { range: string; values: string[][] }[] = [
+        {
+          range: `Members / Subscriptions!B${rowNumber}:C${rowNumber}`,
           values: [[plan, status]],
         },
+      ];
+      if (startAt !== undefined || expireAt !== undefined) {
+        data.push({
+          range: `Members / Subscriptions!D${rowNumber}:E${rowNumber}`,
+          values: [[resolvedStartAt, resolvedExpireAt]],
+        });
+      }
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: { valueInputOption: 'RAW', data },
       });
     }
   }
