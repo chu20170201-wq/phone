@@ -86,6 +86,11 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   const [showAddValueModal, setShowAddValueModal] = useState<Member | null>(null);
   const [selectedValueOption, setSelectedValueOption] = useState<string>('');
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
+  // 全選 / 批次加值
+  const [selectedRowNumbers, setSelectedRowNumbers] = useState<Set<number>>(new Set());
+  const [showBulkAddValueModal, setShowBulkAddValueModal] = useState(false);
+  const [bulkAddValueOption, setBulkAddValueOption] = useState<string>('');
+  const [bulkAddValueLoading, setBulkAddValueLoading] = useState(false);
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
   const [searchUserId, setSearchUserId] = useState<string>('');
@@ -521,6 +526,51 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     { value: 'trial7days', label: '試用期 7 天 / 免費' },
   ];
 
+  const toggleSelectMember = (rowNumber: number) => {
+    setSelectedRowNumbers((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNumber)) next.delete(rowNumber);
+      else next.add(rowNumber);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const onPage = paginatedMembers.map((m) => m.rowNumber);
+    const allSelected = onPage.every((rn) => selectedRowNumbers.has(rn));
+    setSelectedRowNumbers((prev) => {
+      const next = new Set(prev);
+      if (allSelected) onPage.forEach((rn) => next.delete(rn));
+      else onPage.forEach((rn) => next.add(rn));
+      return next;
+    });
+  };
+
+  const handleBulkAddValue = async () => {
+    if (selectedRowNumbers.size === 0 || !bulkAddValueOption) return;
+    const rowNumbers = Array.from(selectedRowNumbers);
+    setBulkAddValueLoading(true);
+    try {
+      for (const rowNumber of rowNumbers) {
+        await axios.post('/api/members', {
+          action: 'add-value',
+          rowNumber,
+          option: bulkAddValueOption,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      setSelectedRowNumbers(new Set());
+      setShowBulkAddValueModal(false);
+      setBulkAddValueOption('');
+      alert(`已為 ${rowNumbers.length} 位會員加值完成。`);
+    } catch (error) {
+      console.error('批次加值失敗:', error);
+      alert('批次加值失敗，請稍後重試');
+    } finally {
+      setBulkAddValueLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deletingMember) return;
 
@@ -724,10 +774,57 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
           </div>
         </div>
 
+        {selectedRowNumbers.size > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-purple-200 bg-purple-50/80 px-4 py-3">
+            <span className="text-sm font-semibold text-purple-800">
+              已選 {selectedRowNumbers.size} 人
+            </span>
+            <select
+              value={bulkAddValueOption}
+              onChange={(e) => setBulkAddValueOption(e.target.value)}
+              className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">選擇加值方案</option>
+              {valueTimeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => bulkAddValueOption && setShowBulkAddValueModal(true)}
+              disabled={!bulkAddValueOption}
+              className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              批次加值
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedRowNumbers(new Set())}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              取消選取
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
+                <th className="px-4 py-4 text-left">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={paginatedMembers.length > 0 && paginatedMembers.every((m) => selectedRowNumbers.has(m.rowNumber))}
+                      onChange={toggleSelectAllOnPage}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">全選</span>
+                  </label>
+                </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                   行號
                 </th>
@@ -758,6 +855,16 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                 
                 return (
                   <tr key={member.rowNumber} className="hover:bg-blue-50/50 transition-colors duration-150">
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedRowNumbers.has(member.rowNumber)}
+                        onChange={() => toggleSelectMember(member.rowNumber)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </label>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {member.rowNumber}
                   </td>
@@ -1278,6 +1385,59 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                   <span>確認加值</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批次加值確認模態框 */}
+      {showBulkAddValueModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
+          <div className="relative top-20 mx-auto p-6 border border-gray-200 w-11/12 md:max-w-md shadow-2xl rounded-2xl bg-white animate-slide-up">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">批次加值確認</h3>
+              <button
+                onClick={() => {
+                  setShowBulkAddValueModal(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2"
+              >
+                <span className="text-xl">✕</span>
+              </button>
+            </div>
+            <p className="text-gray-700 mb-4">
+              確定為 <strong>{selectedRowNumbers.size}</strong> 位會員加值
+              <strong className="text-purple-600 ml-1">
+                {valueTimeOptions.find((o) => o.value === bulkAddValueOption)?.label ?? bulkAddValueOption}
+              </strong>
+              ？
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkAddValueModal(false)}
+                disabled={bulkAddValueLoading}
+                className="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkAddValue}
+                disabled={bulkAddValueLoading}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50 flex items-center gap-2"
+              >
+                {bulkAddValueLoading ? (
+                  <>
+                    <span className="animate-pulse">加值中…</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    確認加值
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
