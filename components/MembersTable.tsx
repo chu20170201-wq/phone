@@ -94,6 +94,8 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
   const [searchUserId, setSearchUserId] = useState<string>('');
+  const [searchPhone, setSearchPhone] = useState<string>('');
+  const [phoneSearchLoading, setPhoneSearchLoading] = useState(false);
   const [detailForm, setDetailForm] = useState<{
     lineName: string;
     status: string;
@@ -571,6 +573,41 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
     }
   };
 
+  const handlePhoneSearch = async () => {
+    const phone = searchPhone.trim();
+    if (!phone) return;
+    setPhoneSearchLoading(true);
+    try {
+      const res = await axios.get('/api/phone-records', {
+        params: { phone },
+      });
+      const records = (res.data?.data || []) as { userId?: string; timestamp?: string }[];
+      if (records.length === 0) {
+        setSearchUserId('');
+        alert('此電話尚無查詢記錄');
+        return;
+      }
+      const sorted = [...records].sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return tb - ta;
+      });
+      const latest = sorted[0];
+      if (latest?.userId) {
+        setSearchUserId(latest.userId);
+        setPage(1);
+      } else {
+        setSearchUserId('');
+        alert('此電話的最近一筆記錄沒有 User ID');
+      }
+    } catch (error) {
+      console.error('電話查詢失敗:', error);
+      alert('電話查詢失敗，請稍後重試');
+    } finally {
+      setPhoneSearchLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deletingMember) return;
 
@@ -626,9 +663,9 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50">
-      <div className="px-6 py-6 sm:p-8">
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50 min-h-[72vh] w-full">
+      <div className="px-6 py-8 sm:px-10 sm:py-10">
+        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               會員管理
@@ -643,21 +680,59 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
             </p>
           </div>
 
-          {/* User ID 搜尋欄位 */}
-          <div className="w-full sm:w-64">
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              搜尋 User ID
-            </label>
-            <input
-              type="text"
-              value={searchUserId}
-              onChange={(e) => {
-                setSearchUserId(e.target.value);
-                setPage(1);
-              }}
-              placeholder="輸入 User ID 進行搜尋"
-              className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
-            />
+          <div className="flex flex-wrap items-end gap-3">
+            {/* 電話搜尋：查最新電話記錄，並把 User ID 帶入右欄 */}
+            <div className="w-full sm:w-64 sm:min-w-[14rem]">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                電話搜尋
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchPhone}
+                  onChange={(e) => setSearchPhone(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePhoneSearch()}
+                  placeholder="輸入電話查詢最新記錄"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+                />
+                <button
+                  type="button"
+                  onClick={handlePhoneSearch}
+                  disabled={phoneSearchLoading || !searchPhone.trim()}
+                  className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {phoneSearchLoading ? '查詢中…' : '查詢'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchPhone('');
+                    setSearchUserId('');
+                  }}
+                  title="清空電話與 User ID"
+                  className="shrink-0 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 border border-gray-200"
+                >
+                  清空
+                </button>
+              </div>
+            </div>
+
+            {/* User ID 搜尋欄位（電話查詢後會自動帶入） */}
+            <div className="w-full sm:w-64">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                搜尋 User ID
+              </label>
+              <input
+                type="text"
+                value={searchUserId}
+                onChange={(e) => {
+                  setSearchUserId(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="輸入 User ID 或由左側電話查詢帶入"
+                className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+              />
+            </div>
           </div>
         </div>
 
