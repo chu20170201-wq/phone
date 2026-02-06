@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getRiskList, updateRiskRecord, deleteRiskRecord } from '@/lib/googleSheets';
+import { cacheGet, cacheSet, cacheDelete } from '@/lib/cache';
+
+const CACHE_TTL_MS = 60 * 1000;
 
 export default async function handler(
   req: NextApiRequest,
@@ -9,14 +12,13 @@ export default async function handler(
     if (req.method === 'GET') {
       const { type, phoneNumber } = req.query;
 
-      let riskList = await getRiskList();
+      const cached = cacheGet<Awaited<ReturnType<typeof getRiskList>>>('risk-list');
+      let riskList = cached ?? await getRiskList();
+      if (cached === null) cacheSet('risk-list', riskList, CACHE_TTL_MS);
 
-      // 根據風險類型篩選
       if (type && typeof type === 'string') {
         riskList = riskList.filter(record => record.type === type);
       }
-
-      // 根據電話號碼篩選
       if (phoneNumber && typeof phoneNumber === 'string') {
         const normalizedPhone = phoneNumber.replace(/\D/g, '');
         riskList = riskList.filter(record => {
@@ -61,6 +63,7 @@ export default async function handler(
       if (status !== undefined) updates.status = status;
 
       await updateRiskRecord(rowNum, updates);
+      cacheDelete('risk-list');
       return res.status(200).json({ success: true, message: '更新成功' });
     }
 
@@ -83,6 +86,7 @@ export default async function handler(
       }
 
       await deleteRiskRecord(rowNum);
+      cacheDelete('risk-list');
       return res.status(200).json({ success: true, message: '刪除成功' });
     }
 

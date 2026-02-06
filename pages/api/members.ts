@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getMembers, getMemberByUserId, updateMember, addValueTime, deleteMemberByRowNumber, ValueTimeOption, syncMembers, ensureMemberExists } from '@/lib/googleSheets';
+import { cacheGet, cacheSet, cacheDelete, cacheDeletePattern } from '@/lib/cache';
+
+const CACHE_TTL_MS = 60 * 1000; // 60 秒
 
 export default async function handler(
   req: NextApiRequest,
@@ -9,30 +12,30 @@ export default async function handler(
     if (req.method === 'GET') {
       const { userId, sync } = req.query;
 
-      // 如果請求同步會員，則先執行同步
       if (sync === 'true') {
         try {
-          const syncResult = await syncMembers();
-          console.log('自動同步會員完成:', syncResult);
+          await syncMembers();
         } catch (syncError) {
           console.error('自動同步會員失敗:', syncError);
         }
+        cacheDeletePattern('members');
       }
 
       if (userId) {
-        // 根據 User ID 查詢單個會員
+        const cacheKey = `member:${userId}`;
+        const cached = cacheGet<unknown>(cacheKey);
+        if (cached !== null) return res.status(200).json({ success: true, data: cached });
         const member = await getMemberByUserId(userId as string);
+        cacheSet(cacheKey, member || null, CACHE_TTL_MS);
         return res.status(200).json({ success: true, data: member || null });
       }
 
-      // 獲取所有會員（自動同步會員）
+      const cached = cacheGet<unknown[]>('members');
+      if (cached !== null) return res.status(200).json({ success: true, data: cached });
+
       const members = await getMembers();
-      
-      // 在後台自動同步會員（不阻塞響應）
-      syncMembers().catch(error => {
-        console.error('後台自動同步會員失敗:', error);
-      });
-      
+      cacheSet('members', members, CACHE_TTL_MS);
+      syncMembers().catch(() => {});
       return res.status(200).json({ success: true, data: members });
     }
 
@@ -47,6 +50,8 @@ export default async function handler(
       }
 
       await updateMember(rowNumber, plan, status, lineName, startAt, expireAt);
+      cacheDeletePattern('members');
+      cacheDeletePattern('recent:');
       return res.status(200).json({ success: true, message: '更新成功' });
     }
 
@@ -56,8 +61,10 @@ export default async function handler(
       // 確保會員存在（如果不存在則創建）
       if (action === 'ensure-member' && userId) {
         try {
-          const result = await ensureMemberExists(userId as string);
-          return res.status(200).json({ 
+        const result = await ensureMemberExists(userId as string);
+        cacheDeletePattern('members');
+        cacheDeletePattern('recent:');
+        return res.status(200).json({
             success: true, 
             message: result.created ? '會員已創建' : '會員已存在',
             data: result
@@ -81,6 +88,8 @@ export default async function handler(
         }
 
         const result = await addValueTime(rowNumber, option as ValueTimeOption);
+        cacheDeletePattern('members');
+        cacheDeletePattern('recent:');
         return res.status(200).json({ 
           success: true, 
           message: '加值成功',
@@ -113,6 +122,8 @@ export default async function handler(
       }
 
       await deleteMemberByRowNumber(rowNum);
+      cacheDeletePattern('members');
+      cacheDeletePattern('recent:');
       return res.status(200).json({ success: true, message: '刪除成功' });
     }
 

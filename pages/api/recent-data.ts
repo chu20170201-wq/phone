@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getPhoneRecords, getMembers } from '@/lib/googleSheets';
+import { cacheGet, cacheSet } from '@/lib/cache';
+
+const CACHE_TTL_MS = 45 * 1000; // 45 秒
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,7 +14,10 @@ export default async function handler(
       const limitNum = limit ? parseInt(limit as string, 10) : 10;
 
       if (type === 'records') {
-        // 獲取最新的電話記錄（按時間戳排序）
+        const cacheKey = `recent:records:${limitNum}`;
+        const cached = cacheGet<unknown>(cacheKey);
+        if (cached !== null) return res.status(200).json(cached as { success: boolean; data: unknown[]; total: number });
+
         const allRecords = await getPhoneRecords();
         
         // 過濾出有時間戳的記錄，並按時間戳降序排序（最新的在前）
@@ -33,18 +39,17 @@ export default async function handler(
             }
           });
 
-        // 取前 N 筆
         const recentRecords = sortedRecords.slice(0, limitNum);
-
-        return res.status(200).json({ 
-          success: true, 
-          data: recentRecords,
-          total: sortedRecords.length
-        });
+        const payload = { success: true, data: recentRecords, total: sortedRecords.length };
+        cacheSet(cacheKey, payload, CACHE_TTL_MS);
+        return res.status(200).json(payload);
       }
 
       if (type === 'members') {
-        // 獲取最新的會員記錄（按加入時間排序）
+        const cacheKey = `recent:members:${limitNum}`;
+        const cached = cacheGet<unknown>(cacheKey);
+        if (cached !== null) return res.status(200).json(cached as { success: boolean; data: unknown[]; total: number });
+
         const allMembers = await getMembers();
         
         // 過濾出有開始時間的會員，並按開始時間降序排序（最新的在前）
@@ -81,14 +86,10 @@ export default async function handler(
             }
           });
 
-        // 取前 N 筆
         const recentMembers = sortedMembers.slice(0, limitNum);
-
-        return res.status(200).json({ 
-          success: true, 
-          data: recentMembers,
-          total: sortedMembers.length
-        });
+        const payload = { success: true, data: recentMembers, total: sortedMembers.length };
+        cacheSet(cacheKey, payload, CACHE_TTL_MS);
+        return res.status(200).json(payload);
       }
 
       return res.status(400).json({ 

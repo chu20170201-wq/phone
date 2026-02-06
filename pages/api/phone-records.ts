@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getPhoneRecords, getRecordsByPhone, getRecordsByUserId, syncMembers, deletePhoneRecordAndRelated } from '@/lib/googleSheets';
+import { cacheGet, cacheSet, cacheDeletePattern } from '@/lib/cache';
+
+const CACHE_TTL_MS = 60 * 1000;
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,35 +15,37 @@ export default async function handler(
       // 如果請求同步會員，則先執行同步
       if (sync === 'true') {
         try {
-          const syncResult = await syncMembers();
-          console.log('自動同步會員完成:', syncResult);
-          // 繼續執行正常的查詢流程
+          await syncMembers();
         } catch (syncError) {
           console.error('自動同步會員失敗:', syncError);
-          // 同步失敗不影響查詢，繼續執行
         }
+        cacheDeletePattern('phone-records');
       }
 
       if (phone) {
-        // 根據電話號碼查詢
+        const cacheKey = `phone-records:phone:${phone}`;
+        const cached = cacheGet<unknown>(cacheKey);
+        if (cached !== null) return res.status(200).json({ success: true, data: cached });
         const records = await getRecordsByPhone(phone as string);
+        cacheSet(cacheKey, records, CACHE_TTL_MS);
         return res.status(200).json({ success: true, data: records });
       }
 
       if (userId) {
-        // 根據 User ID 查詢
+        const cacheKey = `phone-records:userId:${userId}`;
+        const cached = cacheGet<unknown>(cacheKey);
+        if (cached !== null) return res.status(200).json({ success: true, data: cached });
         const records = await getRecordsByUserId(userId as string);
+        cacheSet(cacheKey, records, CACHE_TTL_MS);
         return res.status(200).json({ success: true, data: records });
       }
 
-      // 獲取所有記錄（自動同步會員）
+      const cached = cacheGet<unknown[]>('phone-records');
+      if (cached !== null) return res.status(200).json({ success: true, data: cached });
+
       const records = await getPhoneRecords();
-      
-      // 在後台自動同步會員（不阻塞響應）
-      syncMembers().catch(error => {
-        console.error('後台自動同步會員失敗:', error);
-      });
-      
+      cacheSet('phone-records', records, CACHE_TTL_MS);
+      syncMembers().catch(() => {});
       return res.status(200).json({ success: true, data: records });
     }
 
@@ -73,6 +78,8 @@ export default async function handler(
       }
 
       await deletePhoneRecordAndRelated(rowNum);
+      cacheDeletePattern('phone-records');
+      cacheDeletePattern('recent:');
       return res.status(200).json({ success: true, message: '刪除成功' });
     }
 
