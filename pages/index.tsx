@@ -6,11 +6,12 @@ import PhoneRecordsTable from '@/components/PhoneRecordsTable';
 import MembersTable from '@/components/MembersTable';
 import StatsCards from '@/components/StatsCards';
 import RiskListTable from '@/components/RiskListTable';
+import LineOAPanel from '@/components/LineOAPanel';
 import SearchBar from '@/components/SearchBar';
-import { Phone, Users, BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Phone, Users, BarChart3, AlertTriangle, TrendingUp, MessageCircle } from 'lucide-react';
 import RecentDataReport from '@/components/RecentDataReport';
 
-type Tab = 'records' | 'recent' | 'members' | 'stats' | 'risks';
+type Tab = 'records' | 'recent' | 'members' | 'stats' | 'risks' | 'lineoa';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('records');
@@ -24,6 +25,7 @@ export default function Home() {
     members: false,
     stats: false,
     risks: false,
+    lineoa: false,
   });
 
   const handleTabChange = (tab: Tab) => {
@@ -123,12 +125,23 @@ export default function Home() {
                 <AlertTriangle className="w-5 h-5 mr-2" />
                 風險名單
               </button>
+              <button
+                onClick={() => handleTabChange('lineoa')}
+                className={`flex items-center py-4 px-6 border-b-2 font-semibold text-sm transition-all duration-200 ${
+                  activeTab === 'lineoa'
+                    ? 'border-green-500 text-green-600 bg-green-50/50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
+                }`}
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                LINE OA
+              </button>
             </div>
           </div>
         </div>
 
-        {/* 主要內容區域 */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 主要內容區域（會員管理時加寬） */}
+        <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-8 ${activeTab === 'members' ? 'max-w-[1600px]' : 'max-w-7xl'}`}>
           {/* 搜索欄 */}
           {activeTab === 'records' && (
             <div className="mb-6 animate-fade-in">
@@ -178,6 +191,12 @@ export default function Home() {
             {mountedTabs.risks && (
               <div className={activeTab === 'risks' ? 'animate-fade-in' : 'hidden'}>
                 <RiskListTable />
+              </div>
+            )}
+
+            {mountedTabs.lineoa && (
+              <div className={activeTab === 'lineoa' ? 'animate-fade-in' : 'hidden'}>
+                <LineOAPanel />
               </div>
             )}
           </div>
