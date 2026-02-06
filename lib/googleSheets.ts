@@ -979,3 +979,66 @@ export async function deleteRiskRecord(rowNumber: number) {
     },
   });
 }
+
+// ========== LINE OA 工作表（LineOA）==========
+// 欄位：A=時間(ISO), B=userId, C=displayName, D=profileUrl, E=messageType, F=messageText
+
+export interface LineOARecord {
+  rowNumber: number;
+  timestamp: string;
+  userId: string;
+  displayName: string;
+  profileUrl: string;
+  messageType: string;
+  messageText: string;
+}
+
+export async function getLineOARecords(): Promise<LineOARecord[]> {
+  const sheets = await getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID 未設置');
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'LineOA!A2:F',
+    });
+    const rows = response.data.values || [];
+    return rows.map((row, index) => ({
+      rowNumber: index + 2,
+      timestamp: row[0] || '',
+      userId: row[1] || '',
+      displayName: row[2] || '',
+      profileUrl: row[3] || '',
+      messageType: row[4] || '',
+      messageText: row[5] || '',
+    }));
+  } catch (err) {
+    // 若工作表 LineOA 不存在，回傳空陣列
+    console.warn('讀取 LineOA 工作表失敗（可能尚未建立）:', err);
+    return [];
+  }
+}
+
+export async function appendLineOARecord(record: Omit<LineOARecord, 'rowNumber'>): Promise<void> {
+  const sheets = await getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID 未設置');
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: 'LineOA!A:F',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [[
+        record.timestamp,
+        record.userId,
+        record.displayName,
+        record.profileUrl,
+        record.messageType,
+        record.messageText,
+      ]],
+    },
+  });
+}
