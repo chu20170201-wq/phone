@@ -221,11 +221,11 @@ export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: P
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50">
-      <div className="px-6 py-6 sm:p-8">
-        <div className="flex justify-between items-center mb-6">
+    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-xl md:rounded-2xl overflow-hidden border border-gray-200/50">
+      <div className="px-3 py-4 sm:px-6 sm:py-6 md:p-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
               電話查詢記錄
             </h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -298,54 +298,38 @@ export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: P
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <div className="overflow-x-auto rounded-lg md:rounded-xl border border-gray-200 -mx-1 px-1 sm:mx-0 sm:px-0">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  行號
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  電話號碼
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  風險等級
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  User ID
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  時間
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  會員狀態
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  操作
-                </th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">行號</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">電話</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">風險</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">User ID</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">時間</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">會員</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {paginatedRecords.map((record) => (
                 <tr key={record.rowNumber} className="hover:bg-blue-50/50 transition-colors duration-150 cursor-pointer">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.rowNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <div className="flex items-center">
-                      <span className="font-mono">{record.phoneNumber}</span>
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-900">{record.rowNumber}</td>
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">
+                    <div className="flex items-center min-w-0">
+                      <span className="font-mono truncate max-w-[100px] sm:max-w-none">{record.phoneNumber}</span>
                       {record.isPigeon && (
                         <span className="ml-2 px-2 py-0.5 text-xs font-semibold text-orange-700 bg-orange-100 rounded-full border border-orange-200">鴿子號</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500">
+                    <div className="flex items-center space-x-1 md:space-x-2">
                       {getRiskLevelIcon(record.riskLevel)}
                       {getRiskLevelBadge(record.riskLevel)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 hidden sm:table-cell">
                     <div className="flex items-center space-x-2">
                       <span className="font-mono text-xs" title={record.userId || '無'}>
                         {record.userId || '無'}
@@ -381,10 +365,8 @@ export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: P
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(record.timestamp)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 hidden md:table-cell">{formatDate(record.timestamp)}</td>
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500">
                     {record.isMember ? (
                       <div className="flex items-center space-x-2">
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200 shadow-sm">
@@ -415,7 +397,7 @@ export default function PhoneRecordsTable({ searchQuery, onNavigateToMember }: P
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium">
                     <button
                       onClick={() => setSelectedRecord(record)}
                       className="px-4 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 font-semibold"

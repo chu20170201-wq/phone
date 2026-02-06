@@ -28,11 +28,11 @@ export default function LineOAPanel() {
   });
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50 min-h-[72vh] w-full">
-      <div className="px-6 py-8 sm:px-10 sm:py-10">
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-xl md:rounded-2xl overflow-hidden border border-gray-200/50 min-h-[60vh] md:min-h-[72vh] w-full">
+      <div className="px-3 py-4 sm:px-6 sm:py-6 md:px-10 md:py-10">
+        <div className="flex flex-col gap-3 mb-4 md:mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <MessageCircle className="w-7 h-7 text-green-600" />
               LINE OA 訊息
             </h2>
@@ -76,45 +76,43 @@ export default function LineOAPanel() {
         )}
 
         {!isLoading && !error && records.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-lg md:rounded-xl border border-gray-200 -mx-1 px-1 sm:mx-0 sm:px-0">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">時間</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">頭像 / 名稱</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">User ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">訊息類型</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">訊息內容</th>
+                  <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase">時間</th>
+                  <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase">頭像/名稱</th>
+                  <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase hidden sm:table-cell">User ID</th>
+                  <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase hidden md:table-cell">類型</th>
+                  <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase">訊息</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {records.map((r) => (
                   <tr key={`${r.timestamp}-${r.rowNumber}`} className="hover:bg-green-50/50">
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-gray-600 whitespace-nowrap">
                       {r.timestamp ? format(new Date(r.timestamp), 'yyyy-MM-dd HH:mm:ss') : '-'}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                    <td className="px-2 py-2 md:px-4 md:py-3">
+                      <div className="flex items-center gap-2 md:gap-3">
                         {r.profileUrl ? (
                           <img
                             src={r.profileUrl}
                             alt={r.displayName || 'LINE'}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                            className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                            <User className="w-5 h-5 text-green-600" />
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
                           </div>
                         )}
-                        <span className="font-medium text-gray-900">{r.displayName || '-'}</span>
+                        <span className="font-medium text-gray-900 text-xs md:text-sm truncate max-w-[80px] sm:max-w-none">{r.displayName || '-'}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-600 break-all max-w-[200px]">
-                      {r.userId || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{r.messageType || 'text'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-800 max-w-md truncate" title={r.messageText}>
+                    <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm font-mono text-gray-600 break-all max-w-[100px] sm:max-w-[200px] hidden sm:table-cell">{r.userId || '-'}</td>
+                    <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-gray-600 hidden md:table-cell">{r.messageType || 'text'}</td>
+                    <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-gray-800 max-w-[120px] sm:max-w-md truncate" title={r.messageText}>
                       {r.messageText || '-'}
                     </td>
                   </tr>

@@ -261,25 +261,25 @@ export default function RecentDataReport() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* 標題和說明 */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center space-x-3 mb-2">
-          <TrendingUp className="w-8 h-8 text-white" />
-          <h2 className="text-2xl font-bold text-white">最新數據報表</h2>
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-lg">
+        <div className="flex items-center space-x-2 md:space-x-3 mb-2">
+          <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-white" />
+          <h2 className="text-xl md:text-2xl font-bold text-white">最新數據報表</h2>
         </div>
-        <p className="text-blue-100 text-sm">
+        <p className="text-blue-100 text-xs md:text-sm">
           即時查看最新加入的電話記錄和新會員，方便快速了解系統最新動態
         </p>
       </div>
 
       {/* 最新的電話記錄 */}
-      <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50">
-        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <Phone className="w-6 h-6 text-blue-600" />
-              <h3 className="text-xl font-bold text-gray-900">最新電話記錄</h3>
+      <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-xl md:rounded-2xl overflow-hidden border border-gray-200/50">
+        <div className="px-3 py-3 sm:px-6 sm:py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+            <div className="flex items-center space-x-2 md:space-x-3">
+              <Phone className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+              <h3 className="text-lg md:text-xl font-bold text-gray-900">最新電話記錄</h3>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">顯示筆數：</span>

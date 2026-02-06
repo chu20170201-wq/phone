@@ -293,11 +293,11 @@ export default function RiskListTable() {
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50">
-      <div className="px-6 py-6 sm:p-8">
-        <div className="flex justify-between items-center mb-6">
+    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-xl md:rounded-2xl overflow-hidden border border-gray-200/50">
+      <div className="px-3 py-4 sm:px-6 sm:py-6 md:p-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
               風險名單
             </h2>
             <p className="text-sm text-gray-500 mt-1">

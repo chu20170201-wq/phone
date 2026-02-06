@@ -15,7 +15,7 @@ export default function StatsCards() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="bg-white overflow-hidden shadow rounded-lg animate-pulse">
             <div className="p-5">
@@ -104,29 +104,29 @@ export default function StatsCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
           <div 
             key={stat.name} 
-            className="bg-white/90 backdrop-blur-sm overflow-hidden shadow-xl rounded-2xl border-2 border-gray-200/50 hover:shadow-2xl hover:scale-105 transition-all duration-300 animate-fade-in"
+            className="bg-white/90 backdrop-blur-sm overflow-hidden shadow-xl rounded-xl md:rounded-2xl border-2 border-gray-200/50 hover:shadow-2xl hover:scale-[1.02] sm:hover:scale-105 transition-all duration-300 animate-fade-in"
             style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div className="p-6">
+            <div className="p-4 md:p-6">
               <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <dt className="text-sm font-semibold text-gray-600 mb-2">
+                <div className="flex-1 min-w-0">
+                  <dt className="text-xs md:text-sm font-semibold text-gray-600 mb-1 md:mb-2 truncate">
                     {stat.name}
                   </dt>
                   <dd className="flex items-baseline">
-                    <div className={`text-3xl font-bold ${stat.color}`}>
+                    <div className={`text-2xl md:text-3xl font-bold ${stat.color}`}>
                       {stat.value.toLocaleString()}
                     </div>
                   </dd>
                 </div>
-                <div className={`flex-shrink-0 ${stat.bgColor} rounded-xl p-4 border-2 ${stat.borderColor} shadow-lg`}>
-                  <Icon className={`h-8 w-8 ${stat.color}`} />
+                <div className={`flex-shrink-0 ${stat.bgColor} rounded-lg md:rounded-xl p-2.5 md:p-4 border-2 ${stat.borderColor} shadow-lg`}>
+                  <Icon className={`h-6 w-6 md:h-8 md:w-8 ${stat.color}`} />
                 </div>
               </div>
             </div>

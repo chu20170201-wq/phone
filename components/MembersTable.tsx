@@ -663,11 +663,11 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden border border-gray-200/50 min-h-[72vh] w-full">
-      <div className="px-6 py-8 sm:px-10 sm:py-10">
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:justify-between">
+    <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-xl md:rounded-2xl overflow-hidden border border-gray-200/50 min-h-[60vh] md:min-h-[72vh] w-full">
+      <div className="px-3 py-4 sm:px-6 sm:py-6 md:px-10 md:py-10">
+        <div className="flex flex-col gap-4 mb-4 md:mb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
               會員管理
             </h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -737,11 +737,11 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
         </div>
 
         {/* 篩選和排序控制 */}
-        <div className="mb-6 space-y-4">
+        <div className="mb-4 md:mb-6 space-y-3 md:space-y-4">
           {/* 篩選選項 */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Filter className="w-4 h-4" />
+          <div className="flex flex-wrap gap-2 md:gap-3 items-center">
+            <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm font-medium text-gray-700">
+              <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
               <span>篩選：</span>
             </div>
             
@@ -850,7 +850,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
         </div>
 
         {selectedRowNumbers.size > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-purple-200 bg-purple-50/80 px-4 py-3">
+          <div className="mb-3 md:mb-4 flex flex-wrap items-center gap-2 md:gap-3 rounded-lg md:rounded-xl border-2 border-purple-200 bg-purple-50/80 px-3 py-2.5 md:px-4 md:py-3">
             <span className="text-sm font-semibold text-purple-800">
               已選 {selectedRowNumbers.size} 人
             </span>
@@ -885,42 +885,28 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <div className="overflow-x-auto rounded-lg md:rounded-xl border border-gray-200 -mx-1 px-1 sm:mx-0 sm:px-0">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
-                <th className="px-4 py-4 text-left">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                <th className="px-2 py-2 md:px-4 md:py-4 text-left">
+                  <label className="flex items-center gap-1 md:gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={paginatedMembers.length > 0 && paginatedMembers.every((m) => selectedRowNumbers.has(m.rowNumber))}
                       onChange={toggleSelectAllOnPage}
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">全選</span>
+                    <span className="text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">全選</span>
                   </label>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  行號
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  LINE 資訊
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  LINE 名稱
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  方案
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  狀態
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  到期時間
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  操作
-                </th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">行號</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">LINE 資訊</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">LINE 名稱</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">方案</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">狀態</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">到期</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 text-left text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
@@ -930,7 +916,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                 
                 return (
                   <tr key={member.rowNumber} className="hover:bg-blue-50/50 transition-colors duration-150">
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-2 py-2 md:px-4 md:py-4 whitespace-nowrap">
                     <label className="flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -940,52 +926,51 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                       />
                     </label>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-900">
                     {member.rowNumber}
                   </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">
                       {isEditing ? (
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
-                            <User className="w-6 h-6 text-white" />
+                        <div className="flex items-center space-x-2 md:space-x-3">
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                            <User className="w-4 h-4 md:w-6 md:h-6 text-white" />
                           </div>
                           <input
                             type="text"
                             value={editForm.lineName}
                             onChange={(e) => setEditForm({ ...editForm, lineName: e.target.value })}
                             placeholder="LINE 名稱"
-                            className="px-3 py-1.5 border-2 border-blue-300 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+                            className="px-2 py-1 md:px-3 md:py-1.5 border-2 border-blue-300 rounded-lg text-xs md:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 w-24 sm:w-36 md:min-w-[150px]"
                           />
                         </div>
                       ) : (
-                        <div className="flex items-center space-x-3">
-                          {/* LINE 頭像 */}
+                        <div className="flex items-center space-x-2 md:space-x-3">
                           {member.profileUrl ? (
                             <img
                               src={member.profileUrl}
                               alt={member.displayName || member.lineName || 'LINE 用戶'}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                              className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
                               onError={(e) => {
                                 e.currentTarget.style.display = 'none';
                               }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-gray-200">
-                              <User className="w-6 h-6 text-white" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                              <User className="w-4 h-4 md:w-6 md:h-6 text-white" />
                             </div>
                           )}
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 max-w-[120px] sm:max-w-none">
                             <button
                               type="button"
                               onClick={() => handleEdit(member)}
                               className="text-left w-full"
                             >
-                              <div className="text-sm font-semibold text-gray-900 truncate underline decoration-dashed decoration-gray-400 hover:decoration-solid">
+                              <div className="text-xs md:text-sm font-semibold text-gray-900 truncate underline decoration-dashed decoration-gray-400 hover:decoration-solid">
                                 {member.displayName || member.lineName || '未設定'}
                               </div>
                             </button>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className="font-mono text-xs text-gray-500">
+                            <div className="flex items-center space-x-1 md:space-x-2 mt-0.5 md:mt-1">
+                              <span className="font-mono text-[10px] md:text-xs text-gray-500 truncate block">
                                 {member.userId || '無'}
                               </span>
                       {member.userId && (
@@ -1006,10 +991,10 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                         </div>
                       )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 hidden sm:table-cell">
                       {member.displayName || member.lineName || '-'}
                   </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-3 whitespace-nowrap text-xs md:text-sm text-gray-500">
                       {isEditing ? (
                         <select
                           value={editForm.plan}
@@ -1023,7 +1008,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                         getPlanBadge(member.plan, member.expireAt)
                       )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 hidden md:table-cell">
                       {isEditing ? (
                         <select
                           value={editForm.status}
@@ -1038,7 +1023,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                         getStatusBadge(member.status, member.expireAt)
                       )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-500">
                       <div className="flex flex-col gap-1.5">
                         {isEditing ? (
                           <>
@@ -1097,8 +1082,8 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
                         )}
                       </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                  <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium">
+                      <div className="flex flex-wrap items-center gap-1 md:gap-2">
                         {isEditing ? (
                           <>
                             <button
@@ -1164,7 +1149,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
 
         {/* 分頁 */}
         {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between bg-gray-50 rounded-xl p-4">
+          <div className="mt-4 md:mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50 rounded-lg md:rounded-xl p-3 md:p-4">
             <div className="text-sm text-gray-700 font-medium">
               顯示第 {startIndex + 1} 到 {Math.min(startIndex + itemsPerPage, members.length)} 筆，共 {members.length.toLocaleString()} 筆
             </div>
@@ -1191,7 +1176,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 詳情模態框 */}
       {selectedMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-10 mx-auto p-4 border border-gray-200 w-11/12 md:max-w-xl shadow-2xl rounded-2xl bg-white animate-slide-up">
+          <div className="relative top-4 sm:top-10 mx-auto p-3 sm:p-4 border border-gray-200 w-[94vw] max-w-[94vw] sm:w-11/12 sm:max-w-none md:max-w-xl shadow-2xl rounded-xl md:rounded-2xl bg-white animate-slide-up max-h-[90vh] overflow-y-auto">
             <div>
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                 <h3 className="text-2xl font-bold text-gray-900">會員詳情</h3>
@@ -1373,7 +1358,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 加值時間模態框 */}
       {showAddValueModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-10 mx-auto p-4 border border-gray-200 w-11/12 md:max-w-lg shadow-2xl rounded-2xl bg-white animate-slide-up">
+          <div className="relative top-4 sm:top-10 mx-auto p-3 sm:p-4 border border-gray-200 w-[94vw] max-w-[94vw] sm:w-11/12 sm:max-w-none md:max-w-lg shadow-2xl rounded-xl md:rounded-2xl bg-white animate-slide-up max-h-[90vh] overflow-y-auto">
             <div>
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
@@ -1468,7 +1453,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 批次加值確認模態框 */}
       {showBulkAddValueModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-20 mx-auto p-6 border border-gray-200 w-11/12 md:max-w-md shadow-2xl rounded-2xl bg-white animate-slide-up">
+          <div className="relative top-4 sm:top-20 mx-auto p-4 sm:p-6 border border-gray-200 w-[94vw] max-w-[94vw] sm:w-11/12 sm:max-w-none md:max-w-md shadow-2xl rounded-xl md:rounded-2xl bg-white animate-slide-up max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900">批次加值確認</h3>
               <button
@@ -1521,7 +1506,7 @@ export default function MembersTable({ selectedUserId, onUserIdProcessed }: Memb
       {/* 刪除確認模態框 */}
       {deletingMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in">
-          <div className="relative top-20 mx-auto p-6 border-2 border-red-200 w-11/12 md:w-2/3 lg:w-1/2 shadow-2xl rounded-2xl bg-white animate-slide-up">
+          <div className="relative top-4 sm:top-20 mx-auto p-4 sm:p-6 border-2 border-red-200 w-[94vw] max-w-[94vw] sm:w-11/12 sm:max-w-none md:w-2/3 lg:w-1/2 shadow-2xl rounded-xl md:rounded-2xl bg-white animate-slide-up max-h-[90vh] overflow-y-auto">
             <div className="mt-2">
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
